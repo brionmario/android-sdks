@@ -139,8 +139,8 @@ jobs:
         run: |
           sed -i '/includeBuild("\.\.\/\.\.")\s*{\s*name = "android"\s*}/d' settings.gradle.kts
           perl -0777 -pi -e 's/(RepositoriesMode\.FAIL_ON_PROJECT_REPOS\)\n\s*repositories \{)/$1\n        maven("https:\/\/jitpack.io")/' settings.gradle.kts
-          sed -i "s#implementation(\"dev.thunderid:android\")#implementation(\"com.github.thunder-id.android-sdks:android:v${VERSION}\")#" build.gradle.kts
-          grep -q "com.github.thunder-id.android-sdks:android:v${VERSION}" build.gradle.kts
+          sed -i "s#implementation(\"dev.thunderid:android\")#implementation(\"com.github.thunder-id:android-sdks:v${VERSION}\")#" build.gradle.kts
+          grep -q "com.github.thunder-id:android-sdks:v${VERSION}" build.gradle.kts
           grep -qF 'maven("https://jitpack.io")' settings.gradle.kts
           ! grep -q "includeBuild" settings.gradle.kts
 

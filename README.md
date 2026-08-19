@@ -23,7 +23,7 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("com.github.thunder-id.android-sdks:android:<latest-release-tag>")
+    implementation("com.github.thunder-id:android-sdks:<latest-release-tag>")
 }
 ```
 
