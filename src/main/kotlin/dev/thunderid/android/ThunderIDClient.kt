@@ -230,7 +230,15 @@ class ThunderIDClient {
     suspend fun getUser(): User {
         requireInitialized()
         currentUser?.let { return it }
-        val user: User = httpClient!!.get("/oauth2/userinfo")
+        tokenStore?.accessToken()?.let { token ->
+            val claims = runCatching { decodeJwtToken(token) }.getOrNull()
+            if (claims != null && !(claims["sub"] as? String).isNullOrEmpty()) {
+                val user = User(claims.filterValues { it != null }.mapValues { it.value as Any })
+                currentUser = user
+                return user
+            }
+        }
+        val user = User(claimsFrom(httpClient!!.get("/oauth2/userinfo")))
         currentUser = user
         return user
     }
@@ -246,7 +254,7 @@ class ThunderIDClient {
     ): User {
         requireInitialized()
         val path = if (userId != null) "/scim2/Users/$userId" else "/scim2/Me"
-        val updated: User = httpClient!!.post(path, payload)
+        val updated = User(claimsFrom(httpClient!!.post(path, payload)))
         currentUser = updated
         return updated
     }
@@ -267,6 +275,14 @@ class ThunderIDClient {
     }
 
     // MARK: - Private helpers
+
+    /** Reads a JSON object response as a claim map, without interpreting any of the keys. */
+    private fun claimsFrom(json: com.google.gson.JsonObject): Map<String, Any> {
+        val type = object : com.google.gson.reflect.TypeToken<Map<String, Any>>() {}.type
+        return com.google.gson
+            .Gson()
+            .fromJson(json, type)
+    }
 
     private fun requireInitialized() {
         config ?: throw IAMException(ThunderIDErrorCode.SDK_NOT_INITIALIZED, "Call initialize() before using the SDK")
@@ -300,13 +316,7 @@ class ThunderIDClient {
         tokenStore!!.save(TokenResponse(accessToken = assertion, tokenType = "Bearer"))
         try {
             val claims = decodeJwtToken(assertion)
-            currentUser =
-                User(
-                    sub = claims["sub"] as? String ?: "",
-                    username = claims["username"] as? String ?: claims["preferred_username"] as? String,
-                    email = claims["email"] as? String,
-                    displayName = claims["name"] as? String ?: claims["displayName"] as? String,
-                )
+            currentUser = User(claims.filterValues { it != null }.mapValues { it.value as Any })
         } catch (_: Exception) {
             // assertion is stored; user info will be fetched via getUser() on next access
         }
