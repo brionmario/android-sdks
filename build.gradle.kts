@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "dev.thunderid"
-version = "1.0.1"
+version = "1.0.2"
 
 android {
     namespace = "dev.thunderid.android"
@@ -76,7 +76,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "dev.thunderid"
                 artifactId = "android"
-                version = "1.0.1"
+                version = "1.0.2"
             }
         }
     }
