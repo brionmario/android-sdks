@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.user
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -15,6 +16,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -22,6 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.ImageLoader
+import coil.compose.SubcomposeAsyncImage
+import coil.decode.SvgDecoder
 import dev.thunderid.android.User
 import dev.thunderid.compose.LocalThunderID
 import kotlin.math.abs
@@ -58,15 +64,54 @@ fun BaseUserAvatar(
 ) {
     val name = resolveAvatarName(user)
     val pictureUrl = resolvePictureUrl(user)
-    if (pictureUrl != null) {
-        // NOTE: this codebase has no image-loading dependency (e.g. Coil/Glide/AsyncImage) yet,
-        // and adding one solely for this component would be heavy. Remote profile pictures are
-        // intentionally not fetched here — we always fall back to the initials+gradient renderer
-        // below. Once an image loader is added to the SDK, wire it up here to load `pictureUrl`
-        // and fall back to the gradient only when the load fails or `pictureUrl` is null.
+
+    if (pictureUrl == null) {
+        InitialsAvatar(name = name, size = size, modifier = modifier)
+        return
     }
 
-    val initials = getInitials(name)
+    // The gradient stands in while the picture loads, and stays if it cannot be loaded at all.
+    SubcomposeAsyncImage(
+        model = pictureUrl,
+        imageLoader = avatarImageLoader(LocalContext.current),
+        contentDescription = name,
+        contentScale = ContentScale.Crop,
+        modifier =
+            modifier
+                .size(size)
+                .clip(CircleShape),
+        loading = { InitialsAvatar(name = name, size = size) },
+        error = { InitialsAvatar(name = name, size = size) },
+    )
+}
+
+/**
+ * Image loader used for avatars, kept process wide so every avatar shares one memory and disk
+ * cache. It adds SVG decoding, which the platform decoders do not cover, on top of Coil's
+ * defaults for raster formats.
+ */
+private fun avatarImageLoader(context: Context): ImageLoader {
+    avatarImageLoader?.let { return it }
+    return synchronized(avatarImageLoaderLock) {
+        avatarImageLoader ?: ImageLoader
+            .Builder(context.applicationContext)
+            .components { add(SvgDecoder.Factory()) }
+            .build()
+            .also { avatarImageLoader = it }
+    }
+}
+
+private val avatarImageLoaderLock = Any()
+
+@Volatile
+private var avatarImageLoader: ImageLoader? = null
+
+@Composable
+private fun InitialsAvatar(
+    name: String,
+    size: Dp,
+    modifier: Modifier = Modifier,
+) {
     val brush = rememberAvatarBrush(name = name, size = size)
 
     Box(
@@ -79,7 +124,7 @@ fun BaseUserAvatar(
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = initials,
+            text = getInitials(name),
             color = Color.White,
             fontSize = (size.value * 0.4f).sp,
             fontWeight = FontWeight.SemiBold,
@@ -133,8 +178,8 @@ private fun getInitials(name: String): String =
         .joinToString("")
 
 private fun resolveAvatarName(user: User?): String {
-    val given = (user?.claims?.get("given_name") as? String)?.takeIf { it.isNotBlank() }
-    val family = (user?.claims?.get("family_name") as? String)?.takeIf { it.isNotBlank() }
+    val given = (user?.get("given_name") as? String)?.takeIf { it.isNotBlank() }
+    val family = (user?.get("family_name") as? String)?.takeIf { it.isNotBlank() }
     if (given != null && family != null) {
         return "$given $family"
     }
@@ -144,13 +189,12 @@ private fun resolveAvatarName(user: User?): String {
         ?: "Guest"
 }
 
-private val pictureClaimKeys = listOf("profileUrl", "profile", "URL", "avatarUrl", "avatar")
+private val pictureClaimKeys = listOf("picture", "profileUrl", "profile", "URL", "avatarUrl", "avatar")
 
 private fun resolvePictureUrl(user: User?): String? {
-    user?.profilePicture?.takeIf { it.isNotBlank() }?.let { return it }
-    val claims = user?.claims ?: return null
+    if (user == null) return null
     for (key in pictureClaimKeys) {
-        val value = (claims[key] as? String)?.takeIf { it.isNotBlank() }
+        val value = (user[key] as? String)?.takeIf { it.isNotBlank() }
         if (value != null) return value
     }
     return null

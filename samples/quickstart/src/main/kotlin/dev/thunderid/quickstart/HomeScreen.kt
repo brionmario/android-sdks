@@ -108,7 +108,7 @@ private fun HomeTab(onNavigate: (String) -> Unit) {
         SimpleDateFormat("EEEE, MMMM d", Locale.ENGLISH).format(Date()).uppercase()
     }
     val greetingName = remember(thunder.user) {
-        val given = thunder.user?.claims?.get("given_name") as? String
+        val given = thunder.user?.get("given_name") as? String
         given?.takeIf { it.isNotBlank() }
             ?: thunder.user?.email?.substringBefore("@")?.takeIf { it.isNotBlank() }
             ?: "there"
@@ -378,7 +378,7 @@ private fun ProfileScreen(onBack: () -> Unit) {
     val displayName = remember(thunder.user) { userDisplayName(thunder.user) }
     val email = remember(thunder.user) { thunder.user?.email ?: "" }
     val userId = thunder.user?.sub ?: "—"
-    val username = thunder.user?.username ?: "—"
+    val attributes = remember(thunder.user) { userAttributes(thunder.user) }
 
     Column(
         modifier = Modifier
@@ -428,9 +428,11 @@ private fun ProfileScreen(onBack: () -> Unit) {
                     maxLines = 1,
                 )
             }
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(BorderLight))
-            DetailRow(label = "Username") {
-                Text(text = username, fontSize = 13.sp, color = TextMuted)
+            attributes.forEach { (label, value) ->
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(BorderLight))
+                DetailRow(label = label) {
+                    Text(text = value, fontSize = 13.sp, color = TextMuted)
+                }
             }
         }
 
@@ -726,10 +728,48 @@ private fun formatExpiresIn(expSeconds: Long?, nowSeconds: Long): String {
     }
 }
 
+/**
+ * Every user attribute on the token as a label/value pair. Protocol claims are already
+ * filtered out by the SDK via [User.profileClaims].
+ */
+private fun userAttributes(user: User?): List<Pair<String, String>> =
+    (user?.profileClaims ?: emptyMap())
+        .mapNotNull { (key, value) ->
+            formatClaim(value)?.let { claimLabel(key) to it }
+        }
+        .sortedBy { it.first.lowercase() }
+
+private fun formatClaim(value: Any?): String? =
+    when (value) {
+        is String -> value.takeIf { it.isNotEmpty() }
+        is Boolean -> if (value) "Yes" else "No"
+        is Number -> value.toString()
+        is org.json.JSONArray ->
+            (0 until value.length())
+                .mapNotNull { idx -> formatClaim(value.opt(idx)) }
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString(", ")
+        is List<*> ->
+            value
+                .mapNotNull { formatClaim(it) }
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString(", ")
+        else -> null
+    }
+
+/** Humanizes a claim key for display: `given_name` -> "Given Name". */
+private fun claimLabel(key: String): String =
+    key
+        .replace("_", " ")
+        .replace(Regex("([a-z0-9])([A-Z])"), "$1 $2")
+        .split(" ")
+        .filter { it.isNotEmpty() }
+        .joinToString(" ") { it.replaceFirstChar(Char::uppercaseChar) }
+
 private fun userDisplayName(user: User?): String {
     if (user == null) return "Guest"
-    val given = user.claims?.get("given_name") as? String ?: ""
-    val family = user.claims?.get("family_name") as? String ?: ""
+    val given = user["given_name"] as? String ?: ""
+    val family = user["family_name"] as? String ?: ""
     val full = listOf(given, family).filter { it.isNotEmpty() }.joinToString(" ")
     return full.ifEmpty { user.displayName?.takeIf { it.isNotEmpty() } ?: user.username ?: user.email?.substringBefore("@") ?: "Guest" }
 }

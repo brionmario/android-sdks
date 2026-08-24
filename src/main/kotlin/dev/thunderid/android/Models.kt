@@ -5,15 +5,57 @@ package dev.thunderid.android
 
 import com.google.gson.annotations.SerializedName
 
+/**
+ * The authenticated user.
+ *
+ * A deployment's claims are dynamic, so the user *is* the claim set: every claim comes
+ * through untouched and is readable by key. The few well-known claims mirror the
+ * `KnownUser` keys in the JavaScript SDK and are plain accessors, not mapped fields, so
+ * they read the claim of the same name and nothing else.
+ */
 data class User(
-    val sub: String,
-    val username: String? = null,
-    val email: String? = null,
-    val displayName: String? = null,
-    @SerializedName("picture") val profilePicture: String? = null,
-    val isNewUser: Boolean? = null,
-    val claims: Map<String, Any>? = null,
-)
+    /** Every claim exactly as the server sent it. */
+    val claims: Map<String, Any> = emptyMap(),
+) {
+    /** Reads any claim by name, including ones this SDK has never heard of. */
+    operator fun get(claim: String): Any? = claims[claim]
+
+    val sub: String? get() = this["sub"] as? String
+    val username: String? get() = this["username"] as? String
+    val email: String? get() = this["email"] as? String
+    val displayName: String? get() = this["displayName"] as? String
+    val givenName: String? get() = this["givenName"] as? String
+    val familyName: String? get() = this["familyName"] as? String
+
+    /** Every claim except [RESERVED_CLAIMS]. */
+    val profileClaims: Map<String, Any>
+        get() = claims.filterKeys { it !in RESERVED_CLAIMS }
+
+    companion object {
+        /** Protocol claims: they describe the token, not the user. */
+        val RESERVED_CLAIMS: Set<String> =
+            setOf(
+                "sub",
+                "iss",
+                "aud",
+                "exp",
+                "iat",
+                "nbf",
+                "jti",
+                "azp",
+                "nonce",
+                "typ",
+                "at_hash",
+                "c_hash",
+                "sid",
+                "scope",
+                "client_id",
+                "acr",
+                "amr",
+                "auth_time",
+            )
+    }
+}
 
 data class UserProfile(
     val id: String,
