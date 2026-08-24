@@ -30,8 +30,8 @@ fun ThunderIDProvider(
 ) {
     val resolvedI18n =
         i18n ?: remember(config.vendor) { ThunderIDI18n(storageKey = "${config.vendor}_locale") }
-    val state = remember(client, resolvedI18n) { ThunderIDState(client, resolvedI18n) }
     val scope = rememberCoroutineScope()
+    val state = remember(client, resolvedI18n) { ThunderIDState(client, resolvedI18n, scope) }
 
     LaunchedEffect(config) {
         state.initialize(config)

@@ -227,6 +227,10 @@ class ThunderIDClient {
 
     // MARK: - User & Profile
 
+    fun setCachedUser(user: User) {
+        currentUser = user
+    }
+
     suspend fun getUser(): User {
         requireInitialized()
         currentUser?.let { return it }
@@ -245,18 +249,17 @@ class ThunderIDClient {
 
     suspend fun getUserProfile(): UserProfile {
         requireInitialized()
-        return httpClient!!.get("/scim2/Me")
+        return httpClient!!.get("/users/me")
     }
 
-    suspend fun updateUserProfile(
-        payload: Map<String, Any>,
-        userId: String? = null,
-    ): User {
+    suspend fun getUserSchema(): Map<String, AttributeSchema> {
         requireInitialized()
-        val path = if (userId != null) "/scim2/Users/$userId" else "/scim2/Me"
-        val updated = User(claimsFrom(httpClient!!.post(path, payload)))
-        currentUser = updated
-        return updated
+        return httpClient!!.get<UsersMeMetaResponse>("/users/me/meta").schema
+    }
+
+    suspend fun updateUserProfile(payload: Map<String, Any>): UserProfile {
+        requireInitialized()
+        return httpClient!!.put("/users/me", mapOf("attributes" to payload))
     }
 
     // MARK: - Flow Meta

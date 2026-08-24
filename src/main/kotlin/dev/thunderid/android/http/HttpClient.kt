@@ -42,6 +42,13 @@ internal class HttpClient(
         headers: Map<String, String> = emptyMap(),
     ): T = request("POST", path, body, requiresAuth, headers)
 
+    suspend inline fun <reified T : Any> put(
+        path: String,
+        body: Map<String, Any>,
+        requiresAuth: Boolean = true,
+        headers: Map<String, String> = emptyMap(),
+    ): T = request("PUT", path, body, requiresAuth, headers)
+
     suspend inline fun <reified T : Any> request(
         method: String,
         path: String,

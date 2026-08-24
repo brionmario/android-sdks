@@ -59,7 +59,29 @@ data class User(
 
 data class UserProfile(
     val id: String,
-    val claims: Map<String, Any> = emptyMap(),
+    val ouId: String? = null,
+    val type: String? = null,
+    val attributes: Map<String, Any> = emptyMap(),
+    val display: String? = null,
+    val isReadOnly: Boolean = false,
+)
+
+/** Attribute schema metadata returned by `GET /users/me/meta`. */
+data class AttributeSchema(
+    val credential: Boolean? = null,
+    val description: String? = null,
+    val displayName: String? = null,
+    val mutability: String? = null,
+    val readOnly: Boolean? = null,
+    val regex: String? = null,
+    val required: Boolean? = null,
+    val subAttributes: List<AttributeSchema>? = null,
+    val type: String? = null,
+    val unique: Boolean? = null,
+)
+
+data class UsersMeMetaResponse(
+    val schema: Map<String, AttributeSchema> = emptyMap(),
 )
 
 data class TokenResponse(
