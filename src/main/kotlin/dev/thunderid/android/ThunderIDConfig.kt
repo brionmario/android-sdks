@@ -24,7 +24,9 @@ data class ThunderIDConfig(
     // Application Identity
     val applicationId: String? = null,
     val organizationHandle: String? = null,
-    // Platform Attestation — when enabled, a token from [attestationTokenProvider] is sent with every
+    // User Profile - whether user profile attributes come from /users/me or only from the OIDC access-token/userinfo claims.
+    val fetchUserProfile: Boolean = true,
+    // Platform Attestation - when enabled, a token from [attestationTokenProvider] is sent with every
     // native flow-initiate request (e.g. Google Play Integrity on Android). The provider is invoked by
     // the SDK; the app supplies it since obtaining a platform attestation token is app/platform-specific.
     val attestationEnabled: Boolean = false,
@@ -34,7 +36,7 @@ data class ThunderIDConfig(
     // Storage & Platform
     val storage: StorageAdapter? = null,
     val instanceId: Int? = null,
-    // Development only — bypasses TLS certificate verification. Never use in production.
+    // Development only - bypasses TLS certificate verification. Never use in production.
     val allowInsecureConnections: Boolean = false,
     /**
      * Vendor/brand namespace used to derive default storage identifiers (e.g. EncryptedSharedPreferences file

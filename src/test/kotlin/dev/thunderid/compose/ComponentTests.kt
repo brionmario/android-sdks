@@ -70,6 +70,8 @@ class ComponentTests {
                 "signUp.button",
                 "userProfile.title",
                 "userProfile.save",
+                "userProfile.edit",
+                "userProfile.cancel",
                 "organizationList.empty",
                 "createOrganization.submit",
                 "languageSwitcher.title",
