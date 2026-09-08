@@ -62,7 +62,15 @@ runs:
       # succeeded - including on a run where Maestro's own console output read "2/2 Flows
       # Passed". Continue past that unreliable conclusion and determine the real outcome from
       # run-e2e.sh's own JUnit report in the next step instead, so a genuine pass shows green.
+      #
+      # The same teardown can also hang outright rather than just mis-reporting: `adb emu kill`
+      # returns before the emulator process actually exits, and the step then sits idle until it
+      # eats the whole job's timeout-minutes budget - ending the run in a bare "operation was
+      # canceled" before Check E2E Result ever gets to read report.xml, so a pass looks identical
+      # to every other kind of failure. Bound this step well under the job timeout so a hung
+      # teardown still leaves time for the next step to report the real result.
       continue-on-error: true
+      timeout-minutes: 15
       uses: reactivecircus/android-emulator-runner@62dbb605bba737720e10b196cb4220d374026a6d # v2
       env:
         THUNDERID_VERSION: ${{ inputs.thunderid-version }}
