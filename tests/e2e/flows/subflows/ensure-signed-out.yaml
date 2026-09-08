@@ -1,0 +1,58 @@
+appId: dev.thunderid.Quickstart
+---
+# Bring the app to the unauthenticated landing screen, whatever state it starts in.
+#
+# The SDK persists tokens in EncryptedSharedPreferences, which `clearState: true` does clear, but
+# the app can also be left mid-session by a previous flow that failed part way through. Starting
+# from an explicit known state keeps the suite re-runnable either way.
+- runFlow:
+    when:
+      visible: "Session active"
+    commands:
+      # The scroll-then-tap is wrapped in a retry: a debug screenshot from a failed tapOn on the
+      # equivalent step in signup.yaml showed the list back at the very top, scrolled up again
+      # after scrollUntilVisible had already found "Sign out" - the home screen's own
+      # recomposition (it has a live "expires in" countdown) reset the scroll position in the gap
+      # before the tap landed. Retrying re-does the scroll from wherever the list actually is.
+      - retry:
+          maxRetries: 2
+          commands:
+            - scrollUntilVisible:
+                element: "Sign out"
+                direction: DOWN
+                timeout: 20000
+            # "Token debug" sits immediately above "Sign out" in the action list - see the
+            # equivalent comment in signin.yaml. Let the scroll settle before tapping.
+            - waitForAnimationToEnd:
+                timeout: 3000
+            - tapOn: "Sign out"
+      - extendedWaitUntil:
+          visible: "Get started"
+          timeout: 20000
+
+# The CI emulator's own home-screen launcher, not the app under test, occasionally ANRs right
+# after a cold launchApp - debug screenshots from a failure here showed the landing screen fully
+# rendered ("Get started"/"Sign in" both visible) underneath a "Pixel Launcher isn't responding"
+# system dialog, which blocks it from the view hierarchy Maestro actually queries. No timeout
+# budget fixes this - the dialog sits there until dismissed, however long you wait.
+#
+# A single check-then-wait isn't enough either: the launcher has been observed to still be
+# unresponsive (or to ANR again) *after* a check here found no dialog yet, so the assertion below
+# still hit it. Loop the check-and-dismiss with the wait, so a dialog appearing anywhere in the
+# window - not just at the instant this first runs - still gets caught on the next attempt. Tap
+# "Wait" to let the launcher recover rather than closing anything.
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible: "isn't responding"
+          commands:
+            - tapOn: "Wait"
+
+      # A bare assertVisible relies on Maestro's short default lookup timeout, which is not
+      # always enough for the landing screen to render on a loaded CI emulator/simulator - wait
+      # explicitly.
+      - extendedWaitUntil:
+          visible: "Sign in"
+          timeout: 15000
