@@ -36,3 +36,9 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# ThunderID server distribution downloaded by the E2E suite
+.thunderid-server/
+
+# Maestro JUnit report from the E2E suite.
+tests/e2e/report.xml

@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,7 @@ import dev.thunderid.android.FlowStatus
 import dev.thunderid.compose.LocalThunderID
 import dev.thunderid.compose.ThunderIDState
 import dev.thunderid.compose.components.actions.BaseSignUpButton
+import dev.thunderid.compose.components.exposeTestTagsAsResourceIds
 import kotlinx.coroutines.launch
 
 /** State passed to the [BaseSignUp] builder slot. */
@@ -69,6 +71,33 @@ class SignUpState {
         challengeToken = response.challengeToken
         inputs = response.data?.inputs ?: emptyList()
         actions = response.data?.actions ?: emptyList()
+        seedFieldValues()
+    }
+
+    /**
+     * Two failure modes come from the same source — [fieldValues] only ever grows via
+     * [setField], never shrinks or gets pre-populated:
+     *
+     * 1. A field the user never focuses never gets an entry, since the field only writes on
+     *    change. Submitting with that key missing — as opposed to present but empty — makes
+     *    the server re-prompt for just that field with no action to submit it through,
+     *    permanently stalling the flow.
+     * 2. A field from a *previous* step lingers in [fieldValues] (it's never cleared on
+     *    advancing), so the next step's submission carries it along unasked. The server
+     *    interprets that leaked field as an attempt to re-satisfy the earlier step and
+     *    bounces the flow back to it instead of processing the current one.
+     *
+     * Recomputing [fieldValues] from scratch on every step — keeping only values for names
+     * the current step's [inputs] actually declare, defaulting anything newly required to an
+     * empty string — keeps a submission limited to exactly what this step asks for, never
+     * more or less.
+     */
+    private fun seedFieldValues() {
+        val currentNames = inputs.map { it.name }.toSet()
+        fieldValues.keys.retainAll(currentNames)
+        for (name in currentNames) {
+            if (name !in fieldValues) fieldValues[name] = ""
+        }
     }
 }
 
@@ -82,7 +111,10 @@ fun SignUp(
     val thunderState = LocalThunderID.current
     val i18n = thunderState.i18n
     BaseSignUp(modifier = modifier, onComplete = onComplete, onError = onError) { state ->
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp).exposeTestTagsAsResourceIds(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             BasicText(i18n.resolve("signUp.title"))
             state.error?.let { BasicText(it) }
             state.inputs.forEach { input ->
@@ -93,12 +125,17 @@ fun SignUp(
                         Modifier
                             .fillMaxWidth()
                             .defaultMinSize(minHeight = 44.dp)
+                            .testTag("thunderid-field-${input.name}")
                             .semantics { contentDescription = input.name },
                 )
             }
             state.actions.forEach { action ->
-                BaseSignUpButton(label = action.label ?: i18n.resolve("signUp.submit")) {
-                    state.submit(action.id ?: action.ref ?: "")
+                val actionId = action.id ?: action.ref ?: ""
+                BaseSignUpButton(
+                    label = action.label ?: i18n.resolve("signUp.submit"),
+                    modifier = Modifier.testTag("thunderid-action-$actionId"),
+                ) {
+                    state.submit(actionId)
                 }
             }
             if (state.isLoading) BasicText(i18n.resolve("signUp.loading"))
@@ -170,11 +207,13 @@ private suspend fun handleSignUpResponse(
             onComplete?.invoke()
         }
 
-        FlowStatus.PROMPT_ONLY -> {
+        // A registration flow reports INCOMPLETE, not PROMPT_ONLY, for every step before the last
+        // one, and carries that step's inputs and actions in `data` exactly as PROMPT_ONLY does.
+        // Rendering only PROMPT_ONLY therefore dropped the whole form, leaving an empty sheet.
+        // SignIn already treats the two the same way.
+        FlowStatus.PROMPT_ONLY, FlowStatus.INCOMPLETE -> {
             state.update(response)
         }
-
-        FlowStatus.INCOMPLETE -> {}
 
         FlowStatus.ERROR -> {
             val msg = response.failureReason ?: "Sign-up failed"

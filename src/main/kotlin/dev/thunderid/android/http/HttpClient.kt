@@ -63,9 +63,25 @@ internal class HttpClient(
             }
             val connection =
                 (URL(urlString).openConnection() as HttpURLConnection).apply {
+                    // The bypass is deliberately limited to loopback. Its only legitimate use is
+                    // reaching a development server through the self-signed certificate ThunderID
+                    // generates for localhost, and an attacker cannot sit in the middle of a
+                    // loopback connection. Honouring the flag for arbitrary hosts would turn a
+                    // convenience switch into a full man-in-the-middle hole on the channel
+                    // carrying credentials, assertions and refresh tokens, in any build that
+                    // happened to ship with it enabled.
                     if (allowInsecureConnections && this is HttpsURLConnection) {
-                        sslSocketFactory = insecureSslSocketFactory()
-                        hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+                        if (isLoopbackHost(URL(urlString).host)) {
+                            sslSocketFactory = insecureSslSocketFactory()
+                            hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+                        } else {
+                            throw IAMException(
+                                ThunderIDErrorCode.INVALID_CONFIGURATION,
+                                "allowInsecureConnections only applies to loopback hosts " +
+                                    "(localhost, 127.0.0.1, ::1, 10.0.2.2); refusing to disable " +
+                                    "certificate validation for '${URL(urlString).host}'",
+                            )
+                        }
                     }
                     requestMethod = method
                     setRequestProperty("Content-Type", "application/json")
@@ -128,6 +144,14 @@ internal class HttpClient(
             .fromJson(body, T::class.java)
     }
 
+    /**
+     * Whether [host] is a loopback address, and therefore unreachable by a network attacker.
+     *
+     * `10.0.2.2` is included because that is the Android emulator's alias for the host machine's
+     * loopback interface, which is how an emulator reaches a development server.
+     */
+    private fun isLoopbackHost(host: String?): Boolean = host in LOOPBACK_HOSTS
+
     private fun insecureSslSocketFactory(): javax.net.ssl.SSLSocketFactory {
         val trustAll =
             object : X509TrustManager {
@@ -146,5 +170,16 @@ internal class HttpClient(
         val ctx = SSLContext.getInstance("TLS")
         ctx.init(null, arrayOf<TrustManager>(trustAll), SecureRandom())
         return ctx.socketFactory
+    }
+
+    private companion object {
+        /**
+         * Hosts a network attacker cannot occupy, and therefore the only ones for which
+         * certificate validation may be relaxed.
+         *
+         * `10.0.2.2` is the Android emulator's alias for the host machine's loopback interface,
+         * which is how an emulator reaches a development server.
+         */
+        val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "::1", "[::1]", "10.0.2.2")
     }
 }

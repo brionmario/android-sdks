@@ -178,7 +178,7 @@ fun AuthScreen(applicationId: String) {
         ) {
             when (showSheet) {
                 "login" -> LoginSheetContent(applicationId = applicationId)
-                "signup" -> SignUpSheetContent()
+                "signup" -> SignUpSheetContent(onComplete = { showSheet = null })
             }
         }
     }
@@ -212,7 +212,7 @@ private fun LoginSheetContent(applicationId: String) {
 }
 
 @Composable
-private fun SignUpSheetContent() {
+private fun SignUpSheetContent(onComplete: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -222,7 +222,14 @@ private fun SignUpSheetContent() {
     ) {
         SheetTitle("Create account")
         Spacer(Modifier.height(8.dp))
-        SignUp(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp))
+        // Registration finishes without establishing a session, so the app stays on AuthScreen and
+        // this sheet is not torn down with it the way the sign-in sheet is (a successful sign-in
+        // swaps the whole screen for HomeScreen). Without closing it here the completed flow
+        // leaves an empty sheet covering the app.
+        SignUp(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            onComplete = onComplete,
+        )
     }
 }
 

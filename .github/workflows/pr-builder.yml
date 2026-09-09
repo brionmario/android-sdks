@@ -153,3 +153,8 @@ jobs:
       - name: 🔨 Build Quickstart Sample
         working-directory: samples/quickstart
         run: ./gradlew build -x test
+
+  e2e:
+    name: 🎭 E2E Tests
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+    uses: ./.github/workflows/run-e2e-suite.yml

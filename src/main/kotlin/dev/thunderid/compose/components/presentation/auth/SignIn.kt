@@ -62,6 +62,7 @@ import dev.thunderid.compose.components.actions.adapters.GitHubButton
 import dev.thunderid.compose.components.actions.adapters.GoogleButton
 import dev.thunderid.compose.components.actions.adapters.OutlinedTriggerButton
 import dev.thunderid.compose.components.actions.adapters.PasskeyButton
+import dev.thunderid.compose.components.exposeTestTagsAsResourceIds
 import dev.thunderid.compose.i18n.FlowTemplateResolver
 import dev.thunderid.compose.i18n.ThunderIDI18n
 import kotlinx.coroutines.CancellationException
@@ -124,7 +125,52 @@ class SignInState {
         val flowComponents = response.data?.meta?.components ?: emptyList()
         components = flowComponents
         actions = enrichActions(response.data?.actions ?: emptyList(), flowComponents)
+        seedFieldValues(flowComponents)
     }
+
+    /**
+     * Two failure modes come from the same source — [fieldValues] only ever grows via
+     * [setField], never shrinks or gets pre-populated:
+     *
+     * 1. A field the user never focuses never gets an entry, since the field only writes on
+     *    change. Submitting with that key missing — as opposed to present but empty — makes
+     *    the server re-prompt for just that field with no action to submit it through,
+     *    permanently stalling the flow.
+     * 2. A field from a *previous* step lingers in [fieldValues] (it's never cleared on
+     *    advancing), so the next step's submission carries it along unasked. The server
+     *    interprets that leaked field as an attempt to re-satisfy the earlier step and
+     *    bounces the flow back to it instead of processing the current one.
+     *
+     * Recomputing [fieldValues] from scratch on every step — keeping only values for names
+     * the current step actually declares (from either the flat [inputs] list or the
+     * component tree; some steps only populate one of the two), defaulting anything newly
+     * required to an empty string — keeps a submission limited to exactly what this step
+     * asks for, never more or less.
+     */
+    private fun seedFieldValues(flowComponents: List<FlowComponent>) {
+        val currentNames = inputs.map { it.name }.toSet() + flattenInputNames(flowComponents)
+        fieldValues.keys.retainAll(currentNames)
+        for (name in currentNames) {
+            if (name !in fieldValues) fieldValues[name] = ""
+        }
+    }
+}
+
+/**
+ * Names of every `*_INPUT`-typed node in the component tree, matched the same way
+ * [FieldComponentView] binds them (`ref`, falling back to `id`). Used to seed a fresh
+ * field-value entry for each field the component tree renders, even when the flat `inputs`
+ * list doesn't separately list it.
+ */
+private fun flattenInputNames(components: List<FlowComponent>): List<String> {
+    val result = mutableListOf<String>()
+    for (component in components) {
+        if (component.type?.endsWith("_INPUT") == true) {
+            (component.ref ?: component.id)?.let { result.add(it) }
+        }
+        component.components?.let { result.addAll(flattenInputNames(it)) }
+    }
+    return result
 }
 
 /**
@@ -180,7 +226,10 @@ fun SignIn(
     val thunderState = LocalThunderID.current
     val i18n = thunderState.i18n
     BaseSignIn(applicationId = applicationId, modifier = modifier, onComplete = onComplete, onError = onError) { signInState ->
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp).exposeTestTagsAsResourceIds(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             val error = signInState.error
             if (error != null) {
                 // An error response carries no UI of its own — the previous step's
