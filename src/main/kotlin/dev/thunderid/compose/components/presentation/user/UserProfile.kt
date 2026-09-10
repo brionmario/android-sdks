@@ -48,7 +48,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.thunderid.android.AttributeSchema
@@ -356,7 +358,7 @@ fun UserProfile(
         val editingField = state.fields.firstOrNull { state.isEditing(it.name) }
         Column(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             when {
                 state.isLoading && state.profile == null -> {
@@ -377,9 +379,12 @@ fun UserProfile(
 
                 else -> {
                     Text(
-                        i18n.resolve("userProfile.section"),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        i18n.resolve("userProfile.section").uppercase(),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.4.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 4.dp),
                     )
                     val editablePictureField = state.fields.firstOrNull { isPictureField(it.name) }?.takeIf { !it.isReadonly }
                     val visibleFields = state.fields.filterNot { isPictureField(it.name) }
@@ -732,7 +737,7 @@ fun BaseUserProfile(
         state.isLoading = true
         state.error = null
         try {
-            val loadedSchema = thunderState.client.getUserSchema()
+            val loadedSchema = thunderState.getUserSchema()
             val loadedProfile = thunderState.client.getUserProfile()
             schema = loadedSchema
             applyProfile(loadedSchema, loadedProfile)

@@ -67,8 +67,17 @@ loopback, so the sample's base URL is `https://10.0.2.2:8090`. The debug build s
 `allowInsecureConnections`, which is what lets it accept the server's self-signed certificate.
 
 **Maestro only sees `testTag` because the SDK opts in.** Compose keeps test tags inside its own
-semantics tree; the SDK applies `testTagsAsResourceId` at the root of its flow-rendering
-components so they surface as resource IDs in the platform accessibility tree.
+semantics tree; the SDK applies `testTagsAsResourceId` at the root of any composable tree that
+declares one, whether that's a flow-rendering component like `SignIn`/`SignUp` or a static one
+like `ChangeCredential`'s dialog. A `testTag` with no `exposeTestTagsAsResourceIds()` call
+somewhere above it in that subtree is invisible to Maestro's `id:` selectors even though it
+compiles fine and shows up in a Compose UI test.
+
+**`change-credential.yaml` actually changes the test user's password.** The self-service
+credential write path has no "current value" to verify against, so there is nothing to gate the
+change behind. The flow changes it to a temporary value and back to `TestPassword@123` before
+finishing. If a run fails between those two steps, `e2e_mobile_user` is left on the temporary
+password until a re-run of `change-credential.yaml` changes it back.
 
 **`npx thunderid` cannot be used in CI.** It renders an interactive TUI and aborts with
 `bubbletea: could not open TTY` whenever stdout is not a terminal. `run-e2e.sh` downloads the

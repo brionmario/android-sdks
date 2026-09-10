@@ -262,6 +262,20 @@ class ThunderIDClient {
         return httpClient!!.put("/users/me", mapOf("attributes" to payload))
     }
 
+    /**
+     * Changes one of the signed-in user's own credentials via `POST /users/me/update-credentials`.
+     *
+     * The self-service write path does not verify the account's existing value today, so this
+     * call collects only the new value, matching the React/Vue SDKs.
+     */
+    suspend fun updateUserCredentials(
+        attribute: String = "password",
+        newValue: String,
+    ) {
+        requireInitialized()
+        httpClient!!.post<Unit>("/users/me/update-credentials", mapOf("attributes" to mapOf(attribute to newValue)))
+    }
+
     // MARK: - Flow Meta
 
     suspend fun getFlowMeta(

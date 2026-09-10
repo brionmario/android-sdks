@@ -26,6 +26,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
@@ -37,11 +38,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -51,8 +54,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.thunderid.android.R
 import dev.thunderid.compose.LocalThunderID
 import dev.thunderid.compose.components.actions.SignOutButton
+import dev.thunderid.compose.components.presentation.user.ChangeCredential
 import dev.thunderid.compose.components.presentation.user.UserAvatar
 import dev.thunderid.compose.components.presentation.user.UserProfile
 import kotlinx.coroutines.Dispatchers
@@ -151,7 +156,7 @@ private fun HomeTab(onNavigate: (String) -> Unit) {
             .background(LightBg)
             .verticalScroll(rememberScrollState()),
     ) {
-        Spacer(Modifier.height(56.dp))
+        Spacer(Modifier.height(30.dp))
 
         // Hero: avatar + (date/session row, greeting row)
         Row(
@@ -266,8 +271,8 @@ private fun HomeTab(onNavigate: (String) -> Unit) {
         Spacer(Modifier.height(20.dp))
 
         // Action rows
-        ActionRow(label = "My profile", onClick = { onNavigate("profile") })
-        ActionRow(label = "Token debug", onClick = { onNavigate("token") })
+        ActionRow(label = "Manage Account", onClick = { onNavigate("profile") })
+        ActionRow(label = "Token Debug", onClick = { onNavigate("token") })
 
         // Sign out
         Box(
@@ -381,25 +386,55 @@ private fun ProfileScreen(onBack: () -> Unit) {
             .background(LightBg)
             .verticalScroll(rememberScrollState()),
     ) {
-        Spacer(Modifier.height(56.dp))
+        Spacer(Modifier.height(30.dp))
 
-        // Back button
+        // Back button and page title on the same line, title aligned to the trailing edge.
         Row(
             modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .clickable(onClick = onBack),
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(text = "‹", fontSize = 20.sp, color = PrimaryBlue)
-            Spacer(Modifier.width(4.dp))
-            Text(text = "Home", fontSize = 15.sp, color = PrimaryBlue, fontWeight = FontWeight.Medium)
+            Row(
+                modifier = Modifier.clickable(onClick = onBack),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = "‹", fontSize = 20.sp, color = PrimaryBlue)
+                Spacer(Modifier.width(4.dp))
+                Text(text = "Home", fontSize = 15.sp, color = PrimaryBlue, fontWeight = FontWeight.Medium)
+            }
+
+            Text(
+                text = "Manage Account",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary,
+            )
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
 
         // The styled UserProfile component owns its own data loading, editing and card
         // design end to end — the sample just drops it in, no BaseUserProfile customization.
         UserProfile(modifier = Modifier.fillMaxWidth())
+
+        Spacer(Modifier.height(24.dp))
+
+        // "Security" groups ChangeCredential the same way UserProfile's own "Profile info" header
+        // groups its card — ChangeCredential itself stays header-less so it composes into either
+        // a labelled group like this or on its own.
+        Text(
+            text = "SECURITY",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.4.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
+
+        ChangeCredential(modifier = Modifier.fillMaxWidth())
+
         Spacer(Modifier.height(40.dp))
     }
 }
@@ -423,7 +458,8 @@ private fun DetailCard(content: @Composable () -> Unit) {
             .padding(horizontal = 24.dp)
             .fillMaxWidth()
             .border(1.dp, BorderLight, RoundedCornerShape(12.dp))
-            .background(Color.White, RoundedCornerShape(12.dp)),
+            .background(Color.White, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp)),
     ) {
         content()
     }
