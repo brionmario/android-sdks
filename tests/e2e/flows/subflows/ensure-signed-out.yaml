@@ -41,12 +41,17 @@ appId: dev.thunderid.Quickstart
 # still hit it. Loop the check-and-dismiss with the wait, so a dialog appearing anywhere in the
 # window - not just at the instant this first runs - still gets caught on the next attempt. Tap
 # "Wait" to let the launcher recover rather than closing anything.
+# The pattern has to match the element's *whole* text, not appear somewhere inside it. Maestro
+# compiles a text selector into a full-match regex, so the bare "isn't responding" used here
+# previously never matched the dialog's actual title, "Pixel Launcher isn't responding": the
+# conditional recorded itself as SKIPPED on every attempt while the dialog sat on screen, and
+# the assertion below failed anyway. The `.*` either side are what make it fire.
 - retry:
     maxRetries: 3
     commands:
       - runFlow:
           when:
-            visible: "isn't responding"
+            visible: ".*isn't responding.*"
           commands:
             - tapOn: "Wait"
 
