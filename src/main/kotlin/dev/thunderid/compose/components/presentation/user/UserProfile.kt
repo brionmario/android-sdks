@@ -3,21 +3,34 @@
 
 package dev.thunderid.compose.components.presentation.user
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +49,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import dev.thunderid.android.AttributeSchema
 import dev.thunderid.android.R
 import dev.thunderid.android.User
@@ -56,6 +71,11 @@ private val defaultAttributeMappings: Map<String, List<String>> =
         "picture" to listOf("profile", "profileUrl", "picture", "URL"),
         "username" to listOf("userName", "username", "user_name"),
     )
+
+// Attribute names shown as the dedicated avatar row instead of a plain text row (styled
+// UserProfile only), matched case-insensitively against the shared candidate list
+// BaseUserAvatar already resolves a picture from.
+internal fun isPictureField(name: String): Boolean = pictureClaimKeys.any { it.equals(name, ignoreCase = true) }
 
 /** A schema-described profile field merged with its current value, ready to render. */
 data class ProfileField(
@@ -333,36 +353,102 @@ fun UserProfile(
         onSaved = onSaved,
         onError = onError,
     ) { state ->
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(i18n.resolve("userProfile.title"), style = MaterialTheme.typography.titleLarge)
+        val editingField = state.fields.firstOrNull { state.isEditing(it.name) }
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
             when {
                 state.isLoading && state.profile == null -> {
-                    Text(i18n.resolve("userProfile.loading"))
+                    Text(
+                        i18n.resolve("userProfile.loading"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
 
                 state.error != null -> {
-                    Text(state.error ?: i18n.resolve("userProfile.error.load"))
+                    Text(
+                        state.error ?: i18n.resolve("userProfile.error.load"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
 
                 else -> {
-                    if (state.displayName.isNotEmpty()) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            UserAvatar(size = 64.dp)
-                            Spacer(Modifier.height(8.dp))
-                            Text(state.displayName, style = MaterialTheme.typography.titleMedium)
-                            state.email?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    Text(
+                        i18n.resolve("userProfile.section"),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    val editablePictureField = state.fields.firstOrNull { isPictureField(it.name) }?.takeIf { !it.isReadonly }
+                    val visibleFields = state.fields.filterNot { isPictureField(it.name) }
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column {
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 56.dp)
+                                        .let { rowModifier ->
+                                            if (editablePictureField != null) {
+                                                rowModifier.clickable { state.edit(editablePictureField.name) }
+                                            } else {
+                                                rowModifier
+                                            }
+                                        }.padding(horizontal = 16.dp, vertical = 14.dp),
+                                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_photo),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                                Text(
+                                    i18n.resolve("userProfile.picture.label"),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                UserAvatar(size = 40.dp)
+                                if (editablePictureField != null) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_chevron_right),
+                                        contentDescription = i18n.resolve("userProfile.edit"),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
+                            if (visibleFields.isNotEmpty()) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                )
+                            }
+                            visibleFields.forEachIndexed { index, field ->
+                                if (index > 0) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                        color = MaterialTheme.colorScheme.outlineVariant,
+                                    )
+                                }
+                                ProfileFieldRow(field = field, state = state, i18n = i18n)
+                            }
                         }
-                        HorizontalDivider()
-                    }
-                    state.fields.forEach { field ->
-                        ProfileFieldRow(field = field, state = state, i18n = i18n)
-                        HorizontalDivider()
                     }
                 }
             }
+        }
+
+        if (editingField != null) {
+            ProfileFieldEditDialog(field = editingField, state = state, i18n = i18n)
         }
     }
 }
@@ -375,55 +461,120 @@ private fun ProfileFieldRow(
 ) {
     val label = field.schema.displayName ?: field.schema.description ?: field.name
     val isComplex = field.schema.type == "COMPLEX" && field.rawValue is Map<*, *>
-    val isEditing = state.isEditing(field.name)
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(label, style = MaterialTheme.typography.labelMedium)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Box(modifier = Modifier.weight(1f)) {
-                when {
-                    field.schema.type == "COMPLEX" && field.rawValue is Map<*, *> -> {
-                        ComplexValueView(value = field.rawValue)
-                    }
+    val isEditable = !isComplex && !field.isReadonly
 
-                    isEditing && !field.isReadonly -> {
-                        ProfileFieldEditor(field = field, state = state)
-                    }
-
-                    else -> {
-                        Text(stringifyFieldValue(field.rawValue).ifEmpty { "-" })
-                    }
-                }
-            }
-            when {
-                isComplex -> {
-                    Unit
-                }
-
-                isEditing && !field.isReadonly -> {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextButton(onClick = { state.save(field.name) }) { Text(i18n.resolve("userProfile.save")) }
-                        TextButton(onClick = { state.cancel(field.name) }) { Text(i18n.resolve("userProfile.cancel")) }
-                    }
-                }
-
-                !field.isReadonly -> {
-                    IconButton(onClick = { state.edit(field.name) }, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_edit),
-                            contentDescription = i18n.resolve("userProfile.edit"),
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .let { if (isEditable) it.clickable { state.edit(field.name) } else it }
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            if (isComplex) {
+                ComplexValueView(value = field.rawValue as Map<*, *>)
+            } else {
+                Text(
+                    stringifyFieldValue(field.rawValue).ifEmpty { "-" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
-        state.fieldError(field.name)?.let { message ->
-            Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        if (isEditable) {
+            Icon(
+                painter = painterResource(R.drawable.ic_chevron_right),
+                contentDescription = i18n.resolve("userProfile.edit"),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Full-screen field editor the styled [UserProfile] opens when a row is tapped. Rendered as a
+ * [Dialog] with a fixed size rather than inline content, so it always covers the whole screen
+ * regardless of where the host has placed [UserProfile] (e.g. inside a scrolling column).
+ * Dismisses on the system back gesture/button via [DialogProperties.dismissOnBackPress] in
+ * addition to its own back control and Cancel action.
+ */
+@Composable
+private fun ProfileFieldEditDialog(
+    field: ProfileField,
+    state: UserProfileState,
+    i18n: ThunderIDI18n,
+) {
+    val label = field.schema.displayName ?: field.schema.description ?: field.name
+    Dialog(
+        onDismissRequest = { state.cancel(field.name) },
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
+                Row(
+                    modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = { state.cancel(field.name) }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_arrow_back),
+                            contentDescription = i18n.resolve("userProfile.cancel"),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Text(
+                        i18n.resolve("userProfile.section"),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                Text(
+                    label,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(start = 20.dp, bottom = 20.dp),
+                )
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                    ) {
+                        Text(
+                            i18n.resolve("userProfile.edit.description").replace("{field}", label.lowercase()),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ProfileFieldEditor(field = field, state = state, label = label)
+                            state.fieldError(field.name)?.let { message ->
+                                Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { state.cancel(field.name) }) {
+                                Text(i18n.resolve("userProfile.cancel"), color = MaterialTheme.colorScheme.secondary)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Button(
+                                onClick = { state.save(field.name) },
+                                enabled = !state.isLoading,
+                                shape = RoundedCornerShape(20.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 13.dp),
+                            ) { Text(i18n.resolve("userProfile.save")) }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -432,23 +583,40 @@ private fun ProfileFieldRow(
 private fun ProfileFieldEditor(
     field: ProfileField,
     state: UserProfileState,
+    label: String,
 ) {
     val value = state.fieldValue(field)
     if (field.schema.type == "BOOLEAN") {
-        Checkbox(
-            checked = value == "true",
-            onCheckedChange = { state.setFieldValue(field.name, it.toString()) },
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            Checkbox(
+                checked = value == "true",
+                onCheckedChange = { state.setFieldValue(field.name, it.toString()) },
+            )
+        }
     } else {
         OutlinedTextField(
             value = value,
             onValueChange = { state.setFieldValue(field.name, it) },
+            label = { Text(label) },
+            singleLine = true,
+            isError = state.fieldError(field.name) != null,
+            shape = RoundedCornerShape(4.dp),
+            colors =
+                OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.outline,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    cursorColor = MaterialTheme.colorScheme.onSurface,
+                ),
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .testTag("thunderid-field-${field.name}")
                     .semantics { contentDescription = field.name },
-            singleLine = true,
         )
     }
 }

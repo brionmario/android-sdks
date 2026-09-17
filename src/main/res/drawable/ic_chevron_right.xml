@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Pencil "edit" glyph for the per-field edit trigger in UserProfile, ported from Feather's
-  edit-2 icon (24x24 viewBox, stroke="currentColor" stroke-width="2"). Tinted at render time
-  via ColorFilter to track the surrounding content color.
+  Chevron-right glyph marking an editable UserProfile row, ported from Feather's
+  chevron-right icon (24x24 viewBox, stroke="currentColor" stroke-width="2").
+  Tinted at render time via ColorFilter.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
@@ -15,5 +15,5 @@
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M17,3a2.828,2.828,0,1,1,4,4L7.5,20.5,2,22l1.5,-5.5L17,3z" />
+        android:pathData="M9,18l6,-6l-6,-6" />
 </vector>

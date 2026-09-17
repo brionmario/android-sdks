@@ -7,6 +7,7 @@ import dev.thunderid.android.AttributeSchema
 import dev.thunderid.android.User
 import dev.thunderid.android.UserProfile
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -366,5 +367,21 @@ class UserProfileTest {
         val merged = deepMergeAttributes(mapOf("picture" to "old-url"), mapOf("picture" to "new-url"))
 
         assertEquals("new-url", merged["picture"])
+    }
+
+    // ── isPictureField ───────────────────────────────────────────────────────
+
+    @Test
+    fun `isPictureField matches every shared picture claim candidate case-insensitively`() {
+        pictureClaimKeys.forEach { candidate ->
+            assertTrue("expected '$candidate' to match", isPictureField(candidate))
+            assertTrue("expected '${candidate.uppercase()}' to match", isPictureField(candidate.uppercase()))
+        }
+    }
+
+    @Test
+    fun `isPictureField does not match an unrelated attribute name`() {
+        assertFalse(isPictureField("firstName"))
+        assertFalse(isPictureField("email"))
     }
 }

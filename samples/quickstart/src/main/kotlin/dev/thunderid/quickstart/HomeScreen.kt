@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,10 +42,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -54,14 +51,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.thunderid.android.R
 import dev.thunderid.compose.LocalThunderID
 import dev.thunderid.compose.components.actions.SignOutButton
-import dev.thunderid.compose.components.presentation.user.BaseUserProfile
-import dev.thunderid.compose.components.presentation.user.ProfileField
 import dev.thunderid.compose.components.presentation.user.UserAvatar
-import dev.thunderid.compose.components.presentation.user.UserProfileState
-import dev.thunderid.compose.components.presentation.user.stringifyFieldValue
+import dev.thunderid.compose.components.presentation.user.UserProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -402,122 +395,12 @@ private fun ProfileScreen(onBack: () -> Unit) {
             Text(text = "Home", fontSize = 15.sp, color = PrimaryBlue, fontWeight = FontWeight.Medium)
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(8.dp))
 
-        // BaseUserProfile (unstyled) drives the /users/me data and edit/save state, so this
-        // screen keeps its own card design and just adds the pencil edit control to it.
-        BaseUserProfile { state ->
-            Column(modifier = Modifier.fillMaxWidth()) {
-                when {
-                    state.isLoading && state.profile == null -> {
-                        Text(
-                            text = "Loading profile…",
-                            fontSize = 13.sp,
-                            color = TextMuted,
-                            modifier = Modifier.padding(horizontal = 24.dp),
-                        )
-                    }
-
-                    state.error != null -> {
-                        Text(
-                            text = state.error ?: "Failed to load profile.",
-                            fontSize = 13.sp,
-                            color = Color(0xFFD32F2F),
-                            modifier = Modifier.padding(horizontal = 24.dp),
-                        )
-                    }
-
-                    else -> {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            UserAvatar(size = 56.dp)
-                            Spacer(Modifier.height(10.dp))
-                            Text(text = state.displayName, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                            Spacer(Modifier.height(2.dp))
-                            state.email?.let { Text(text = it, fontSize = 13.sp, color = TextMuted) }
-                        }
-
-                        Spacer(Modifier.height(32.dp))
-
-                        SectionHeader(title = "ACCOUNT DETAILS")
-                        DetailCard {
-                            state.fields.forEachIndexed { index, field ->
-                                if (index > 0) {
-                                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(BorderLight))
-                                }
-                                ProfileFieldRow(field = field, state = state)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
+        // The styled UserProfile component owns its own data loading, editing and card
+        // design end to end — the sample just drops it in, no BaseUserProfile customization.
+        UserProfile(modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(40.dp))
-    }
-}
-
-@Composable
-private fun ProfileFieldRow(
-    field: ProfileField,
-    state: UserProfileState,
-) {
-    val label = field.schema.displayName ?: field.schema.description ?: field.name
-    val isEditing = state.isEditing(field.name)
-    DetailRow(label = label) {
-        Column(horizontalAlignment = Alignment.End) {
-            if (isEditing && !field.isReadonly) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    BasicTextField(
-                        value = state.fieldValue(field),
-                        onValueChange = { state.setFieldValue(field.name, it) },
-                        textStyle = TextStyle(fontSize = 13.sp, color = TextPrimary, textAlign = TextAlign.End),
-                        singleLine = true,
-                        modifier = Modifier.width(110.dp),
-                    )
-                    Spacer(Modifier.width(18.dp))
-                    IconButton(onClick = { state.save(field.name) }, modifier = Modifier.size(22.dp)) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_check),
-                            contentDescription = "Save $label",
-                            tint = SuccessGreen,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                    IconButton(onClick = { state.cancel(field.name) }, modifier = Modifier.size(22.dp)) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_close),
-                            contentDescription = "Cancel $label",
-                            tint = TextMuted,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = stringifyFieldValue(field.rawValue).ifEmpty { "-" },
-                        fontSize = 13.sp,
-                        color = TextMuted,
-                    )
-                    if (!field.isReadonly) {
-                        IconButton(onClick = { state.edit(field.name) }, modifier = Modifier.size(22.dp)) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_edit),
-                                contentDescription = "Edit $label",
-                                tint = PrimaryBlue,
-                                modifier = Modifier.size(14.dp),
-                            )
-                        }
-                    }
-                }
-            }
-            state.fieldError(field.name)?.let { message ->
-                Text(text = message, fontSize = 11.sp, color = Color(0xFFD32F2F))
-            }
-        }
     }
 }
 

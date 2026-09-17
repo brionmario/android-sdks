@@ -31,6 +31,13 @@ class ThunderIDState(
     var error by mutableStateOf<String?>(null)
         internal set
 
+    // Bumped on every mergeUserProfile() call so avatar image loads can bust their cache
+    // deterministically on an explicit profile update, even when the updated content is
+    // byte-identical to a claims-content hash (e.g. a picture URL that serves different bytes
+    // on each request behind the same address). A content hash alone cannot detect that case.
+    var profileVersion by mutableStateOf(0)
+        internal set
+
     /** Mirrors [dev.thunderid.android.ThunderIDConfig.fetchUserProfile]. */
     var fetchUserProfileEnabled: Boolean = true
         internal set
@@ -75,6 +82,7 @@ class ThunderIDState(
         val merged = current.copy(claims = current.claims + profile.attributes)
         user = merged
         client.setCachedUser(merged)
+        profileVersion++
     }
 
     // Launched on scope rather than awaited inline, since initialize()/refresh() are called
