@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import coil.ImageLoader
 import coil.compose.SubcomposeAsyncImage
 import coil.decode.SvgDecoder
+import coil.request.ImageRequest
 import dev.thunderid.android.User
 import dev.thunderid.compose.LocalThunderID
 import kotlin.math.abs
@@ -46,7 +48,7 @@ fun UserAvatar(
     modifier: Modifier = Modifier,
 ) {
     val state = LocalThunderID.current
-    BaseUserAvatar(user = state.user, size = size, modifier = modifier)
+    BaseUserAvatar(user = state.user, size = size, modifier = modifier, cacheBuster = state.profileVersion)
 }
 
 /**
@@ -55,12 +57,19 @@ fun UserAvatar(
  * Ported bit-for-bit from the web SDK's `Avatar` primitive (`generateBackgroundColor` +
  * `getInitials` in `packages/react/src/components/primitives/Avatar/Avatar.tsx`), so the same
  * seed name always resolves to the same gradient/initials pair across platforms.
+ *
+ * @param cacheBuster Optional value the caller bumps on every explicit profile update (e.g.
+ *   [dev.thunderid.compose.ThunderIDState.profileVersion]). Forces a fresh image load on that
+ *   change even when the picture URL and the rest of [user]'s claims are unchanged, which a
+ *   content-based cache key alone cannot do for a URL that serves different bytes on each
+ *   request behind the same address.
  */
 @Composable
 fun BaseUserAvatar(
     user: User?,
     size: Dp = 40.dp,
     modifier: Modifier = Modifier,
+    cacheBuster: Any? = null,
 ) {
     val name = resolveAvatarName(user)
     val pictureUrl = resolvePictureUrl(user)
@@ -70,10 +79,28 @@ fun BaseUserAvatar(
         return
     }
 
+    val context = LocalContext.current
+
+    // Cache key includes the user's claims content and cacheBuster, not just the URL: the
+    // picture URL can point at content that changes behind the same address (e.g. a re-uploaded
+    // profile picture), and a plain URL-keyed cache would keep serving the old bitmap until the
+    // URL itself happens to change. Every other recomposition between updates still hits Coil's
+    // cache normally, since neither input changes without an explicit profile update.
+    val cacheKey = "$pictureUrl#${user?.hashCode()}#$cacheBuster"
+    val request =
+        remember(cacheKey) {
+            ImageRequest
+                .Builder(context)
+                .data(pictureUrl)
+                .memoryCacheKey(cacheKey)
+                .diskCacheKey(cacheKey)
+                .build()
+        }
+
     // The gradient stands in while the picture loads, and stays if it cannot be loaded at all.
     SubcomposeAsyncImage(
-        model = pictureUrl,
-        imageLoader = avatarImageLoader(LocalContext.current),
+        model = request,
+        imageLoader = avatarImageLoader(context),
         contentDescription = name,
         contentScale = ContentScale.Crop,
         modifier =
@@ -189,7 +216,9 @@ private fun resolveAvatarName(user: User?): String {
         ?: "Guest"
 }
 
-private val pictureClaimKeys = listOf("picture", "profileUrl", "profile", "URL", "avatarUrl", "avatar")
+// Candidate claim/attribute names that hold a picture URL, shared with UserProfile.kt's
+// isPictureField() so the two stay in sync instead of drifting as separate lists.
+internal val pictureClaimKeys = listOf("picture", "profileUrl", "profile", "URL", "avatarUrl", "avatar")
 
 private fun resolvePictureUrl(user: User?): String? {
     if (user == null) return null

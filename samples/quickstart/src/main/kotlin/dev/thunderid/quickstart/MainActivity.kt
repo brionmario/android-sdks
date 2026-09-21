@@ -37,7 +37,13 @@ class MainActivity : ComponentActivity() {
             allowInsecureConnections = BuildConfig.DEBUG,
         )
 
-        val colorScheme = lightColorScheme(primary = ThunderIDPrimary)
+        val colorScheme = lightColorScheme(
+            primary = ThunderIDPrimary,
+            secondary = Color(0xFF345F91),
+            surfaceVariant = Color(0xFFF2F2F2),
+            onSurfaceVariant = Color(0xFF49454F),
+            outlineVariant = Color(0x1F1D1B20),
+        )
 
         setContent {
             MaterialTheme(colorScheme = colorScheme) {
