@@ -7,6 +7,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.thunderid.android.AttributeSchema
 import dev.thunderid.android.ThunderIDClient
 import dev.thunderid.android.ThunderIDConfig
 import dev.thunderid.android.User
@@ -14,6 +15,8 @@ import dev.thunderid.android.UserProfile
 import dev.thunderid.compose.i18n.ThunderIDI18n
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Reactive auth state for Compose. Held inside [rememberThunderIDState]. */
 @Stable
@@ -42,6 +45,14 @@ class ThunderIDState(
     var fetchUserProfileEnabled: Boolean = true
         internal set
 
+    /** Cached `GET /users/me/meta` result, shared by every mounted component that needs the
+     * user type schema (e.g. [dev.thunderid.compose.components.presentation.user.UserProfile]
+     * and [dev.thunderid.compose.components.presentation.user.ChangeCredential]), so a screen
+     * that mounts several of them issues one request instead of one per component. */
+    var userSchema by mutableStateOf<Map<String, AttributeSchema>?>(null)
+        internal set
+    private val schemaMutex = Mutex()
+
     val isSignedIn: Boolean get() = user != null
 
     internal suspend fun initialize(config: ThunderIDConfig) {
@@ -67,12 +78,22 @@ class ThunderIDState(
         try {
             val signedIn = client.isSignedIn()
             user = if (signedIn) client.getUser() else null
+            userSchema = null
             if (signedIn && fetchUserProfileEnabled) launchUserProfileSync()
             error = null
         } catch (e: Exception) {
             error = e.message
         } finally {
             isLoading = false
+        }
+    }
+
+    /** Returns the cached user type schema, fetching it once on first access. Concurrent callers
+     * during that first fetch share the same in-flight request rather than issuing their own. */
+    suspend fun getUserSchema(): Map<String, AttributeSchema> {
+        userSchema?.let { return it }
+        return schemaMutex.withLock {
+            userSchema ?: client.getUserSchema().also { userSchema = it }
         }
     }
 
