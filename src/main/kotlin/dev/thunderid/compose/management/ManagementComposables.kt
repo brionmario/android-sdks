@@ -184,12 +184,14 @@ fun rememberDeleteUser(fetcher: ThunderIDFetcher? = null): ResourceMutationState
 fun rememberGetAgents(
     limit: Int? = null,
     offset: Int? = null,
+    filter: String? = null,
     fetcher: ThunderIDFetcher? = null,
     enabled: Boolean = true,
 ): ResourceQueryState<AgentListResponse> =
-    rememberResourceQuery(listOf(AgentQueryKeys.AGENTS, "limit=${limit ?: ""}", "offset=${offset ?: ""}"), enabled) {
-        it.agents.list(limit, offset, fetcher)
-    }
+    rememberResourceQuery(
+        listOf(AgentQueryKeys.AGENTS, "filter=${filter.orEmpty()}", "limit=${limit ?: ""}", "offset=${offset ?: ""}"),
+        enabled,
+    ) { it.agents.list(limit, offset, filter, fetcher) }
 
 @Composable
 fun rememberGetAgent(

@@ -59,7 +59,7 @@ class AdminComponentsTest {
     @Test
     fun `ships every admin string the components use`() {
         val keys = DefaultStrings.all.keys.filter { it.startsWith("admin.") }
-        assertEquals(110, keys.size)
+        assertEquals(120, keys.size)
         listOf("user", "group", "agent", "app").forEach {
             assertTrue(DefaultStrings.all.containsKey("admin.common.identity_types.$it"))
         }
@@ -182,5 +182,30 @@ class AdminComponentsTest {
 
         assertEquals(40, requested)
         assertNull(state.onSelect)
+    }
+
+    @Test
+    fun `list state carries the search for custom UIs`() {
+        var applied: AdminSearch? = AdminSearch("username", "ada")
+        val state =
+            AdminListState(
+                rows = emptyList<String>(),
+                isLoading = false,
+                error = null,
+                limit = 20,
+                offset = 0,
+                totalResults = 0,
+                selectedId = null,
+                onPageChange = null,
+                onSelect = null,
+                search = applied,
+                searchAttributes = listOf(AdminOption("Username", "username")),
+                onSearch = { applied = it },
+            )
+
+        state.onSearch?.invoke(null)
+
+        assertNull(applied)
+        assertEquals(listOf("username"), state.searchAttributes.map { it.value })
     }
 }

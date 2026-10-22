@@ -119,14 +119,25 @@ class AgentsClient internal constructor(
     private val transport: ManagementTransport,
     private val typesTransport: ManagementTransport,
 ) {
-    /** Returns a page of agents. */
+    /**
+     * Returns a page of agents.
+     *
+     * @param filter A server-side filter on a custom agent attribute, such as `name eq "Calendar Agent"`.
+     *   [ManagementFilter.equality] builds one.
+     */
     suspend fun list(
         limit: Int? = null,
         offset: Int? = null,
+        filter: String? = null,
         fetcher: ThunderIDFetcher? = null,
     ): AgentListResponse =
         transport.list(
-            mapOf("limit" to limit?.toString(), "offset" to offset?.toString(), "include" to "display"),
+            mapOf(
+                "limit" to limit?.toString(),
+                "offset" to offset?.toString(),
+                "filter" to filter,
+                "include" to "display",
+            ),
             fetcher,
         )
 

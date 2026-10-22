@@ -8,7 +8,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -37,6 +41,9 @@ private val ROLE_ASSIGNEE_TYPE_ORDER =
  * [candidates] holds. Unassigning is offered only when [onUnassign] is set.
  *
  * @param error A translated message to show in place of the assignments.
+ * @param typeFilter The assignee type the list is narrowed to, or `null` for every type.
+ * @param onTypeFilterChange Narrows the list to one assignee type, or back to every type with `null`. The type
+ *   filter shows only when set.
  * @param content Renders custom UI in place of the default table and picker, from the assignments, the
  *   candidates, the loading and error state, and the assign and unassign actions.
  */
@@ -52,6 +59,8 @@ fun BaseRoleAssignments(
     onUnassign: ((RoleAssignment) -> Unit)? = null,
     title: String? = null,
     description: String? = null,
+    typeFilter: RoleAssigneeType? = null,
+    onTypeFilterChange: ((RoleAssigneeType?) -> Unit)? = null,
     content: (@Composable (RoleAssignmentsState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
@@ -66,6 +75,8 @@ fun BaseRoleAssignments(
                     isMutating = isMutating,
                     onAssign = onAssign.takeIf { candidates != null },
                     onUnassign = onUnassign,
+                    typeFilter = typeFilter,
+                    onTypeFilterChange = onTypeFilterChange,
                 ),
             )
         }
@@ -98,6 +109,19 @@ fun BaseRoleAssignments(
         title = title ?: i18n.resolve("admin.roles.assignments.title"),
         description = description,
     ) {
+        onTypeFilterChange?.let { change ->
+            AdminSelect(
+                label = i18n.resolve("admin.common.filters.type"),
+                options =
+                    listOf(AdminOption(i18n.resolve("admin.common.filters.all_types"), "")) +
+                        ROLE_ASSIGNEE_TYPE_ORDER.map {
+                            AdminOption(i18n.resolve("admin.common.identity_types.${it.value}"), it.value)
+                        },
+                value = typeFilter?.value.orEmpty(),
+                onChange = { value -> change(ROLE_ASSIGNEE_TYPE_ORDER.firstOrNull { it.value == value }) },
+                testTag = adminTag("role-assignments", "type-filter"),
+            )
+        }
         if (onAssign != null && candidates != null) {
             AdminIdentityPicker(
                 block = "role-assignments",
@@ -128,6 +152,7 @@ fun BaseRoleAssignments(
  * Shows who a role is assigned to through the role management operations.
  *
  * @param editable Lets the role be assigned to users, groups and agents, and be unassigned. Off by default.
+ * @param filterable Shows the assignee type filter, which narrows the list on the server. On by default.
  * @param content Renders custom UI in place of the default table and picker. See [BaseRoleAssignments].
  */
 @Composable
@@ -135,13 +160,15 @@ fun RoleAssignments(
     roleId: String,
     modifier: Modifier = Modifier,
     editable: Boolean = false,
+    filterable: Boolean = true,
     title: String? = null,
     description: String? = null,
     content: (@Composable (RoleAssignmentsState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     val scope = rememberCoroutineScope()
-    val assignments = rememberGetRoleAssignments(roleId, limit = 100)
+    var typeFilter by remember(roleId) { mutableStateOf<RoleAssigneeType?>(null) }
+    val assignments = rememberGetRoleAssignments(roleId, limit = 100, type = typeFilter)
     val users = rememberGetUsers(limit = 100, enabled = editable)
     val groups = rememberGetGroups(limit = 100, enabled = editable)
     val agents = rememberGetAgents(limit = 100, enabled = editable)
@@ -195,6 +222,8 @@ fun RoleAssignments(
             },
         title = title,
         description = description,
+        typeFilter = typeFilter,
+        onTypeFilterChange = if (filterable) ({ typeFilter = it }) else null,
         content = content,
     )
 }

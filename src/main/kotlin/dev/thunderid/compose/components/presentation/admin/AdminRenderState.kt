@@ -14,12 +14,21 @@ import dev.thunderid.android.management.RoleAssignment
 import dev.thunderid.android.management.RoleAssignmentInput
 import dev.thunderid.android.management.RoleResourcePermissions
 
+/** A search an admin list applies on the server: the attribute to match and the value it must equal. */
+data class AdminSearch(
+    val attribute: String,
+    val value: String,
+)
+
 /**
  * What an admin list hands its `content` lambda, so the rows can be shown with any UI.
  *
  * @property totalResults The total on the server, or the number of rows given when it is unknown.
  * @property onPageChange Shows the page that starts at the given offset. `null` when the list is not paginated.
  * @property onSelect Chooses a row. `null` when rows are not selectable.
+ * @property search The search currently applied, if any.
+ * @property searchAttributes The attributes that can be searched, with translated labels.
+ * @property onSearch Applies a search on the server, or clears it with `null`. `null` when the list cannot be searched.
  */
 data class AdminListState<T>(
     val rows: List<T>,
@@ -31,6 +40,9 @@ data class AdminListState<T>(
     val selectedId: String?,
     val onPageChange: ((Int) -> Unit)?,
     val onSelect: ((T) -> Unit)?,
+    val search: AdminSearch? = null,
+    val searchAttributes: List<AdminOption> = emptyList(),
+    val onSearch: ((AdminSearch?) -> Unit)? = null,
 )
 
 /**
@@ -153,6 +165,9 @@ data class GroupMembersState(
  * @property candidates The identities the role can be assigned to, by type. `null` when assigning is not allowed.
  * @property onAssign Assigns the role. `null` when assigning is not allowed.
  * @property onUnassign Removes an assignment. `null` when unassigning is not allowed.
+ * @property typeFilter The assignee type the list is narrowed to, or `null` for every type.
+ * @property onTypeFilterChange Narrows the list to one assignee type on the server, or back to every type with
+ *   `null`. `null` when the list cannot be filtered.
  */
 data class RoleAssignmentsState(
     val assignments: List<RoleAssignment>,
@@ -162,6 +177,8 @@ data class RoleAssignmentsState(
     val isMutating: Boolean,
     val onAssign: ((RoleAssignmentInput) -> Unit)?,
     val onUnassign: ((RoleAssignment) -> Unit)?,
+    val typeFilter: RoleAssigneeType? = null,
+    val onTypeFilterChange: ((RoleAssigneeType?) -> Unit)? = null,
 )
 
 /**
