@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.admin
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,6 +25,8 @@ import dev.thunderid.compose.management.rememberGetUsers
  * @param onSelect Receives the chosen user. Rows are selectable only when set.
  * @param title Heading of the list. Pass an empty string to hide it.
  * @param actions Controls rendered next to the title, such as a button that opens [UserCreate].
+ * @param content Renders custom UI in place of the default list, from the users, the loading and error state,
+ *   and the pagination and selection handlers.
  */
 @Composable
 fun BaseUserList(
@@ -40,8 +43,27 @@ fun BaseUserList(
     title: String? = null,
     description: String? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    content: (@Composable (AdminListState<ManagedUser>) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                AdminListState(
+                    rows = users,
+                    isLoading = isLoading,
+                    error = error,
+                    limit = limit,
+                    offset = offset,
+                    totalResults = totalResults ?: users.size,
+                    selectedId = selectedUserId,
+                    onPageChange = onPageChange,
+                    onSelect = onSelect,
+                ),
+            )
+        }
+        return
+    }
     AdminSection(
         block = "user-list",
         modifier = modifier,
@@ -69,7 +91,11 @@ fun BaseUserList(
     }
 }
 
-/** Lists the users the signed-in user may see, a page at a time, through the user management operations. */
+/**
+ * Lists the users the signed-in user may see, a page at a time, through the user management operations.
+ *
+ * @param content Renders custom UI in place of the default list. See [BaseUserList].
+ */
 @Composable
 fun UserList(
     modifier: Modifier = Modifier,
@@ -80,6 +106,7 @@ fun UserList(
     title: String? = null,
     description: String? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    content: (@Composable (AdminListState<ManagedUser>) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     var offset by remember(filter, limit) { mutableStateOf(0) }
@@ -98,5 +125,6 @@ fun UserList(
         title = title,
         description = description,
         actions = actions,
+        content = content,
     )
 }

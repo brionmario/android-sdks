@@ -145,4 +145,42 @@ class AdminComponentsTest {
         assertTrue(state.can("system:user:view"))
         assertFalse(state.can("system:group:view"))
     }
+
+    // ── Render state ───────────────────────────────────────────────────────
+
+    @Test
+    fun `role permissions state names resource servers and falls back to the identifier`() {
+        val state =
+            RolePermissionsState(
+                permissions = listOf(RoleResourcePermissions("rs-1", listOf("read"))),
+                isLoading = false,
+                error = null,
+                resourceServerNames = mapOf("rs-1" to "Orders API"),
+            )
+
+        assertEquals("Orders API", state.resourceServerName("rs-1"))
+        assertEquals("rs-9", state.resourceServerName("rs-9"))
+    }
+
+    @Test
+    fun `list state hands pagination back to the caller`() {
+        var requested: Int? = null
+        val state =
+            AdminListState(
+                rows = listOf("a", "b"),
+                isLoading = false,
+                error = null,
+                limit = 20,
+                offset = 20,
+                totalResults = 45,
+                selectedId = null,
+                onPageChange = { requested = it },
+                onSelect = null,
+            )
+
+        state.onPageChange?.invoke(40)
+
+        assertEquals(40, requested)
+        assertNull(state.onSelect)
+    }
 }

@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.admin
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,6 +35,8 @@ private val GROUP_MEMBER_TYPE_ORDER = listOf(GroupMemberType.USER, GroupMemberTy
  * holds. Removing is offered only when [onRemove] is set.
  *
  * @param error A translated message to show in place of the members.
+ * @param content Renders custom UI in place of the default table and picker, from the members, the candidates,
+ *   the loading and error state, and the add and remove actions.
  */
 @Composable
 fun BaseGroupMembers(
@@ -47,8 +50,25 @@ fun BaseGroupMembers(
     onRemove: ((GroupMember) -> Unit)? = null,
     title: String? = null,
     description: String? = null,
+    content: (@Composable (GroupMembersState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                GroupMembersState(
+                    members = members,
+                    candidates = candidates.takeIf { onAdd != null },
+                    isLoading = isLoading,
+                    error = error,
+                    isMutating = isMutating,
+                    onAdd = onAdd.takeIf { candidates != null },
+                    onRemove = onRemove,
+                ),
+            )
+        }
+        return
+    }
     val columns =
         mutableListOf<AdminColumn<GroupMember>>(
             AdminColumn(i18n.resolve("admin.groups.members.columns.member"), 2f) { Text(it.display ?: it.id) },
@@ -106,6 +126,7 @@ fun BaseGroupMembers(
  * Shows the members of a group through the group management operations.
  *
  * @param editable Lets users and agents be added to the group and members be removed. Off by default.
+ * @param content Renders custom UI in place of the default table and picker. See [BaseGroupMembers].
  */
 @Composable
 fun GroupMembers(
@@ -114,6 +135,7 @@ fun GroupMembers(
     editable: Boolean = false,
     title: String? = null,
     description: String? = null,
+    content: (@Composable (GroupMembersState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     val scope = rememberCoroutineScope()
@@ -163,5 +185,6 @@ fun GroupMembers(
             },
         title = title,
         description = description,
+        content = content,
     )
 }

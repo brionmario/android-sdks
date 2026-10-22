@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.admin
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +28,8 @@ data class RoleCreateSubmission(
  *
  * @param error A translated message to show above the form.
  * @param onCancel Shows a cancel button that calls it when set.
+ * @param content Renders custom UI in place of the default form, from the name and description with their
+ *   setters, the submit action and the submission state.
  */
 @Composable
 fun BaseRoleCreate(
@@ -37,10 +40,33 @@ fun BaseRoleCreate(
     onCancel: (() -> Unit)? = null,
     title: String? = null,
     description: String? = null,
+    content: (@Composable (NamedResourceFormState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     var name by remember { mutableStateOf("") }
     var roleDescription by remember { mutableStateOf("") }
+    val isValid = name.isNotBlank()
+    val submit = {
+        if (isValid && !isSubmitting) onSubmit(RoleCreateSubmission(name.trim(), roleDescription.trim().ifEmpty { null }))
+    }
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                NamedResourceFormState(
+                    name = name,
+                    onNameChange = { name = it },
+                    description = roleDescription,
+                    onDescriptionChange = { roleDescription = it },
+                    isValid = isValid,
+                    isSubmitting = isSubmitting,
+                    error = error,
+                    submit = submit,
+                    onCancel = onCancel,
+                ),
+            )
+        }
+        return
+    }
     AdminSection(
         block = "role-create",
         modifier = modifier,
@@ -59,10 +85,10 @@ fun BaseRoleCreate(
         AdminFormActions(
             block = "role-create",
             submitLabel = i18n.resolve("admin.roles.create.submit"),
-            canSubmit = name.isNotBlank(),
+            canSubmit = isValid,
             isSubmitting = isSubmitting,
             onCancel = onCancel,
-            onSubmit = { onSubmit(RoleCreateSubmission(name.trim(), roleDescription.trim().ifEmpty { null })) },
+            onSubmit = submit,
         )
     }
 }
@@ -72,6 +98,7 @@ fun BaseRoleCreate(
  * is `null`, the signed-in user's organization unit.
  *
  * @param onCreated Receives the role as the server stored it.
+ * @param content Renders custom UI in place of the default form. See [BaseRoleCreate].
  */
 @Composable
 fun RoleCreate(
@@ -81,6 +108,7 @@ fun RoleCreate(
     onCancel: (() -> Unit)? = null,
     title: String? = null,
     description: String? = null,
+    content: (@Composable (NamedResourceFormState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     val scope = rememberCoroutineScope()
@@ -106,5 +134,6 @@ fun RoleCreate(
         onCancel = onCancel,
         title = title,
         description = description,
+        content = content,
     )
 }

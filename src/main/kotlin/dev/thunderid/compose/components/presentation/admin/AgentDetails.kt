@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.admin
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -23,6 +24,8 @@ import kotlinx.coroutines.launch
  *
  * @param error A translated message to show.
  * @param actions Controls rendered next to the agent's name.
+ * @param content Renders custom UI in place of the default view, from the agent, its groups and roles, the
+ *   loading and error state, and the delete action.
  */
 @Composable
 fun BaseAgentDetails(
@@ -35,8 +38,25 @@ fun BaseAgentDetails(
     isDeleting: Boolean = false,
     onDelete: (() -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    content: (@Composable (AgentDetailsState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                AgentDetailsState(
+                    agent = agent,
+                    groups = groups,
+                    roles = roles,
+                    isLoading = isLoading,
+                    error = error,
+                    isDeleting = isDeleting,
+                    onDelete = onDelete.takeIf { agent != null && agent.isReadOnly != true },
+                ),
+            )
+        }
+        return
+    }
     if (agent == null) {
         AdminSection(block = "agent-details", modifier = modifier) {
             if (isLoading) AdminLoading() else AdminErrorBanner(error ?: i18n.resolve("admin.common.errors.not_found"))
@@ -93,6 +113,7 @@ fun BaseAgentDetails(
  *
  * @param deletable Shows a delete action, which asks for confirmation. Off by default.
  * @param onDeleted Called once the agent is deleted, for example to navigate away.
+ * @param content Renders custom UI in place of the default view. See [BaseAgentDetails].
  */
 @Composable
 fun AgentDetails(
@@ -101,6 +122,7 @@ fun AgentDetails(
     deletable: Boolean = false,
     onDeleted: (() -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    content: (@Composable (AgentDetailsState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     val scope = rememberCoroutineScope()
@@ -125,5 +147,6 @@ fun AgentDetails(
                 null
             },
         actions = actions,
+        content = content,
     )
 }

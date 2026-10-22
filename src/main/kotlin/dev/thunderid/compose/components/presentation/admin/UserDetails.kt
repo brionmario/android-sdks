@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.admin
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.OutlinedButton
@@ -37,6 +38,8 @@ import kotlinx.coroutines.launch
  * @param hiddenAttributes Attributes never shown or edited.
  * @param onUpdate Receives every attribute of the user, with the edited text attributes replaced.
  * @param actions Controls rendered next to the user's name.
+ * @param content Renders custom UI in place of the default view, from the user, their visible attributes and
+ *   groups, the loading and error state, and the delete and update actions.
  */
 @Composable
 fun BaseUserDetails(
@@ -51,9 +54,29 @@ fun BaseUserDetails(
     onDelete: (() -> Unit)? = null,
     onUpdate: ((Map<String, Any?>) -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    content: (@Composable (UserDetailsState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     var draft by remember(user?.id) { mutableStateOf<Map<String, String>?>(null) }
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                UserDetailsState(
+                    user = user,
+                    displayName = user?.let { resolveManagedIdentityName(it) }.orEmpty(),
+                    attributes = visibleAttributes(user?.attributes, hiddenAttributes).toMap(),
+                    groups = groups,
+                    isLoading = isLoading,
+                    error = error,
+                    isDeleting = isDeleting,
+                    isUpdating = isUpdating,
+                    onDelete = onDelete.takeIf { user != null && user.isReadOnly != true },
+                    onUpdate = onUpdate.takeIf { user != null && user.isReadOnly != true },
+                ),
+            )
+        }
+        return
+    }
 
     if (user == null) {
         AdminSection(block = "user-details", modifier = modifier) {
@@ -150,6 +173,7 @@ fun BaseUserDetails(
  * @param deletable Shows a delete action, which asks for confirmation. Off by default.
  * @param editable Lets the user's text attributes be edited in place. Off by default.
  * @param onDeleted Called once the user is deleted, for example to navigate away.
+ * @param content Renders custom UI in place of the default view. See [BaseUserDetails].
  */
 @Composable
 fun UserDetails(
@@ -160,6 +184,7 @@ fun UserDetails(
     onDeleted: (() -> Unit)? = null,
     hiddenAttributes: List<String> = listOf("password"),
     actions: (@Composable RowScope.() -> Unit)? = null,
+    content: (@Composable (UserDetailsState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     val scope = rememberCoroutineScope()
@@ -199,5 +224,6 @@ fun UserDetails(
                 null
             },
         actions = actions,
+        content = content,
     )
 }

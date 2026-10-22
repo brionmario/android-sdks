@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.admin
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,6 +32,8 @@ data class AgentCreateSubmission(
  * @param agentTypes The agent types to choose from. The first is chosen by default.
  * @param error A translated message to show above the form.
  * @param onCancel Shows a cancel button that calls it when set.
+ * @param content Renders custom UI in place of the default form, from the agent types, the name, type and
+ *   description with their setters, the submit action and the submission state.
  */
 @Composable
 fun BaseAgentCreate(
@@ -42,12 +45,38 @@ fun BaseAgentCreate(
     onCancel: (() -> Unit)? = null,
     title: String? = null,
     description: String? = null,
+    content: (@Composable (AgentCreateFormState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     var name by remember { mutableStateOf("") }
     var chosenType by remember { mutableStateOf("") }
     val type = chosenType.ifEmpty { agentTypes.firstOrNull()?.value.orEmpty() }
     var agentDescription by remember { mutableStateOf("") }
+    val isValid = name.isNotBlank() && type.isNotEmpty()
+    val submit = {
+        if (isValid && !isSubmitting) onSubmit(AgentCreateSubmission(name.trim(), type, agentDescription.trim().ifEmpty { null }))
+    }
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                AgentCreateFormState(
+                    agentTypes = agentTypes,
+                    name = name,
+                    onNameChange = { name = it },
+                    type = type,
+                    onTypeChange = { chosenType = it },
+                    description = agentDescription,
+                    onDescriptionChange = { agentDescription = it },
+                    isValid = isValid,
+                    isSubmitting = isSubmitting,
+                    error = error,
+                    submit = submit,
+                    onCancel = onCancel,
+                ),
+            )
+        }
+        return
+    }
     AdminSection(
         block = "agent-create",
         modifier = modifier,
@@ -74,10 +103,10 @@ fun BaseAgentCreate(
         AdminFormActions(
             block = "agent-create",
             submitLabel = i18n.resolve("admin.agents.create.submit"),
-            canSubmit = name.isNotBlank() && type.isNotEmpty(),
+            canSubmit = isValid,
             isSubmitting = isSubmitting,
             onCancel = onCancel,
-            onSubmit = { onSubmit(AgentCreateSubmission(name.trim(), type, agentDescription.trim().ifEmpty { null })) },
+            onSubmit = submit,
         )
     }
 }
@@ -88,6 +117,7 @@ fun BaseAgentCreate(
  *
  * @param owner The identifier of the agent's owner, if any.
  * @param onCreated Receives the agent as the server stored it.
+ * @param content Renders custom UI in place of the default form. See [BaseAgentCreate].
  */
 @Composable
 fun AgentCreate(
@@ -98,6 +128,7 @@ fun AgentCreate(
     onCancel: (() -> Unit)? = null,
     title: String? = null,
     description: String? = null,
+    content: (@Composable (AgentCreateFormState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     val scope = rememberCoroutineScope()
@@ -136,5 +167,6 @@ fun AgentCreate(
         onCancel = onCancel,
         title = title,
         description = description,
+        content = content,
     )
 }

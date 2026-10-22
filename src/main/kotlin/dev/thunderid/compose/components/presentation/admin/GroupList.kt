@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.admin
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +24,8 @@ import dev.thunderid.compose.management.rememberGetGroups
  * @param onSelect Receives the chosen group. Rows are selectable only when set.
  * @param title Heading of the list. Pass an empty string to hide it.
  * @param actions Controls rendered next to the title, such as a button that opens [GroupCreate].
+ * @param content Renders custom UI in place of the default list, from the groups, the loading and error state,
+ *   and the pagination and selection handlers.
  */
 @Composable
 fun BaseGroupList(
@@ -39,8 +42,27 @@ fun BaseGroupList(
     title: String? = null,
     description: String? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    content: (@Composable (AdminListState<Group>) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                AdminListState(
+                    rows = groups,
+                    isLoading = isLoading,
+                    error = error,
+                    limit = limit,
+                    offset = offset,
+                    totalResults = totalResults ?: groups.size,
+                    selectedId = selectedGroupId,
+                    onPageChange = onPageChange,
+                    onSelect = onSelect,
+                ),
+            )
+        }
+        return
+    }
     AdminSection(
         block = "group-list",
         modifier = modifier,
@@ -68,7 +90,11 @@ fun BaseGroupList(
     }
 }
 
-/** Lists groups, a page at a time, through the group management operations. */
+/**
+ * Lists groups, a page at a time, through the group management operations.
+ *
+ * @param content Renders custom UI in place of the default list. See [BaseGroupList].
+ */
 @Composable
 fun GroupList(
     modifier: Modifier = Modifier,
@@ -78,6 +104,7 @@ fun GroupList(
     title: String? = null,
     description: String? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    content: (@Composable (AdminListState<Group>) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     var offset by remember(limit) { mutableStateOf(0) }
@@ -96,5 +123,6 @@ fun GroupList(
         title = title,
         description = description,
         actions = actions,
+        content = content,
     )
 }

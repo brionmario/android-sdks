@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.admin
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +37,8 @@ private val ROLE_ASSIGNEE_TYPE_ORDER =
  * [candidates] holds. Unassigning is offered only when [onUnassign] is set.
  *
  * @param error A translated message to show in place of the assignments.
+ * @param content Renders custom UI in place of the default table and picker, from the assignments, the
+ *   candidates, the loading and error state, and the assign and unassign actions.
  */
 @Composable
 fun BaseRoleAssignments(
@@ -49,8 +52,25 @@ fun BaseRoleAssignments(
     onUnassign: ((RoleAssignment) -> Unit)? = null,
     title: String? = null,
     description: String? = null,
+    content: (@Composable (RoleAssignmentsState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                RoleAssignmentsState(
+                    assignments = assignments,
+                    candidates = candidates.takeIf { onAssign != null },
+                    isLoading = isLoading,
+                    error = error,
+                    isMutating = isMutating,
+                    onAssign = onAssign.takeIf { candidates != null },
+                    onUnassign = onUnassign,
+                ),
+            )
+        }
+        return
+    }
     val columns =
         mutableListOf<AdminColumn<RoleAssignment>>(
             AdminColumn(i18n.resolve("admin.roles.assignments.columns.assignee"), 2f) { Text(it.display ?: it.id) },
@@ -108,6 +128,7 @@ fun BaseRoleAssignments(
  * Shows who a role is assigned to through the role management operations.
  *
  * @param editable Lets the role be assigned to users, groups and agents, and be unassigned. Off by default.
+ * @param content Renders custom UI in place of the default table and picker. See [BaseRoleAssignments].
  */
 @Composable
 fun RoleAssignments(
@@ -116,6 +137,7 @@ fun RoleAssignments(
     editable: Boolean = false,
     title: String? = null,
     description: String? = null,
+    content: (@Composable (RoleAssignmentsState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     val scope = rememberCoroutineScope()
@@ -173,5 +195,6 @@ fun RoleAssignments(
             },
         title = title,
         description = description,
+        content = content,
     )
 }

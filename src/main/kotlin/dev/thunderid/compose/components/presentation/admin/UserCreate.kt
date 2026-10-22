@@ -4,6 +4,7 @@
 package dev.thunderid.compose.components.presentation.admin
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
@@ -86,6 +87,8 @@ internal fun isUserCreateComplete(
  * @param userTypes The user types to choose from. The first is chosen by default.
  * @param error A translated message to show above the form.
  * @param onCancel Shows a cancel button that calls it when set.
+ * @param content Renders custom UI in place of the default form, from the user types, the fields, the type and
+ *   attribute values with their setters, the submit action and the submission state.
  */
 @Composable
 fun BaseUserCreate(
@@ -98,11 +101,36 @@ fun BaseUserCreate(
     onCancel: (() -> Unit)? = null,
     title: String? = null,
     description: String? = null,
+    content: (@Composable (UserCreateFormState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     var chosenType by remember { mutableStateOf("") }
     val type = chosenType.ifEmpty { userTypes.firstOrNull()?.value.orEmpty() }
     val values = remember { mutableStateMapOf<String, String>() }
+    val isValid = isUserCreateComplete(type, fields, values)
+    val submit = {
+        if (isValid && !isSubmitting) onSubmit(userCreateSubmission(type, values.toMap()))
+    }
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                UserCreateFormState(
+                    userTypes = userTypes,
+                    fields = fields,
+                    type = type,
+                    onTypeChange = { chosenType = it },
+                    values = values.toMap(),
+                    onValueChange = { name, value -> values[name] = value },
+                    isValid = isValid,
+                    isSubmitting = isSubmitting,
+                    error = error,
+                    submit = submit,
+                    onCancel = onCancel,
+                ),
+            )
+        }
+        return
+    }
     AdminSection(
         block = "user-create",
         modifier = modifier,
@@ -134,10 +162,10 @@ fun BaseUserCreate(
         AdminFormActions(
             block = "user-create",
             submitLabel = i18n.resolve("admin.users.create.submit"),
-            canSubmit = isUserCreateComplete(type, fields, values),
+            canSubmit = isValid,
             isSubmitting = isSubmitting,
             onCancel = onCancel,
-            onSubmit = { onSubmit(userCreateSubmission(type, values.toMap())) },
+            onSubmit = submit,
         )
     }
 }
@@ -180,6 +208,7 @@ internal fun AdminFormActions(
  * user's organization unit. Offers the user types the server lists.
  *
  * @param onCreated Receives the user as the server stored it.
+ * @param content Renders custom UI in place of the default form. See [BaseUserCreate].
  */
 @Composable
 fun UserCreate(
@@ -190,6 +219,7 @@ fun UserCreate(
     onCancel: (() -> Unit)? = null,
     title: String? = null,
     description: String? = null,
+    content: (@Composable (UserCreateFormState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     val scope = rememberCoroutineScope()
@@ -222,5 +252,6 @@ fun UserCreate(
         onCancel = onCancel,
         title = title,
         description = description,
+        content = content,
     )
 }

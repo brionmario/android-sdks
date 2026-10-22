@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.admin
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -50,6 +51,8 @@ internal fun AdminTextField(
  *
  * @param error A translated message to show above the form.
  * @param onCancel Shows a cancel button that calls it when set.
+ * @param content Renders custom UI in place of the default form, from the name and description with their
+ *   setters, the submit action and the submission state.
  */
 @Composable
 fun BaseGroupCreate(
@@ -60,10 +63,33 @@ fun BaseGroupCreate(
     onCancel: (() -> Unit)? = null,
     title: String? = null,
     description: String? = null,
+    content: (@Composable (NamedResourceFormState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     var name by remember { mutableStateOf("") }
     var groupDescription by remember { mutableStateOf("") }
+    val isValid = name.isNotBlank()
+    val submit = {
+        if (isValid && !isSubmitting) onSubmit(GroupCreateSubmission(name.trim(), groupDescription.trim().ifEmpty { null }))
+    }
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                NamedResourceFormState(
+                    name = name,
+                    onNameChange = { name = it },
+                    description = groupDescription,
+                    onDescriptionChange = { groupDescription = it },
+                    isValid = isValid,
+                    isSubmitting = isSubmitting,
+                    error = error,
+                    submit = submit,
+                    onCancel = onCancel,
+                ),
+            )
+        }
+        return
+    }
     AdminSection(
         block = "group-create",
         modifier = modifier,
@@ -82,10 +108,10 @@ fun BaseGroupCreate(
         AdminFormActions(
             block = "group-create",
             submitLabel = i18n.resolve("admin.groups.create.submit"),
-            canSubmit = name.isNotBlank(),
+            canSubmit = isValid,
             isSubmitting = isSubmitting,
             onCancel = onCancel,
-            onSubmit = { onSubmit(GroupCreateSubmission(name.trim(), groupDescription.trim().ifEmpty { null })) },
+            onSubmit = submit,
         )
     }
 }
@@ -95,6 +121,7 @@ fun BaseGroupCreate(
  * user's organization unit.
  *
  * @param onCreated Receives the group as the server stored it.
+ * @param content Renders custom UI in place of the default form. See [BaseGroupCreate].
  */
 @Composable
 fun GroupCreate(
@@ -104,6 +131,7 @@ fun GroupCreate(
     onCancel: (() -> Unit)? = null,
     title: String? = null,
     description: String? = null,
+    content: (@Composable (NamedResourceFormState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     val scope = rememberCoroutineScope()
@@ -129,5 +157,6 @@ fun GroupCreate(
         onCancel = onCancel,
         title = title,
         description = description,
+        content = content,
     )
 }

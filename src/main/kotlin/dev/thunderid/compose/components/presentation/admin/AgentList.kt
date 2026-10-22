@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.admin
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +24,8 @@ import dev.thunderid.compose.management.rememberGetAgents
  * @param onSelect Receives the chosen agent. Rows are selectable only when set.
  * @param title Heading of the list. Pass an empty string to hide it.
  * @param actions Controls rendered next to the title, such as a button that opens [AgentCreate].
+ * @param content Renders custom UI in place of the default list, from the agents, the loading and error state,
+ *   and the pagination and selection handlers.
  */
 @Composable
 fun BaseAgentList(
@@ -39,8 +42,27 @@ fun BaseAgentList(
     title: String? = null,
     description: String? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    content: (@Composable (AdminListState<BasicAgent>) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                AdminListState(
+                    rows = agents,
+                    isLoading = isLoading,
+                    error = error,
+                    limit = limit,
+                    offset = offset,
+                    totalResults = totalResults ?: agents.size,
+                    selectedId = selectedAgentId,
+                    onPageChange = onPageChange,
+                    onSelect = onSelect,
+                ),
+            )
+        }
+        return
+    }
     AdminSection(
         block = "agent-list",
         modifier = modifier,
@@ -69,7 +91,11 @@ fun BaseAgentList(
     }
 }
 
-/** Lists agents, a page at a time, through the agent management operations. */
+/**
+ * Lists agents, a page at a time, through the agent management operations.
+ *
+ * @param content Renders custom UI in place of the default list. See [BaseAgentList].
+ */
 @Composable
 fun AgentList(
     modifier: Modifier = Modifier,
@@ -79,6 +105,7 @@ fun AgentList(
     title: String? = null,
     description: String? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    content: (@Composable (AdminListState<BasicAgent>) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     var offset by remember(limit) { mutableStateOf(0) }
@@ -97,5 +124,6 @@ fun AgentList(
         title = title,
         description = description,
         actions = actions,
+        content = content,
     )
 }

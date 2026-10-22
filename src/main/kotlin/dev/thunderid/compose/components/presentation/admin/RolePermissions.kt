@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.admin
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.thunderid.android.management.RoleResourcePermissions
@@ -18,6 +19,8 @@ internal fun grantedPermissions(permissions: List<RoleResourcePermissions>): Lis
  *
  * @param error A translated message to show in place of the permissions.
  * @param resourceServerNames Names to show for resource server identifiers. The identifier is shown otherwise.
+ * @param content Renders custom UI in place of the default view, from the granted permissions grouped by
+ *   resource server, the loading and error state, and a resource server name lookup.
  */
 @Composable
 fun BaseRolePermissions(
@@ -28,9 +31,23 @@ fun BaseRolePermissions(
     resourceServerNames: Map<String, String> = emptyMap(),
     title: String? = null,
     description: String? = null,
+    content: (@Composable (RolePermissionsState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     val granted = grantedPermissions(permissions)
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                RolePermissionsState(
+                    permissions = granted,
+                    isLoading = isLoading,
+                    error = error,
+                    resourceServerNames = resourceServerNames,
+                ),
+            )
+        }
+        return
+    }
     AdminSection(
         block = "role-permissions",
         modifier = modifier,
@@ -66,7 +83,11 @@ fun BaseRolePermissions(
     }
 }
 
-/** Shows the permissions a role grants, loaded through the role management operations. Read-only. */
+/**
+ * Shows the permissions a role grants, loaded through the role management operations. Read-only.
+ *
+ * @param content Renders custom UI in place of the default view. See [BaseRolePermissions].
+ */
 @Composable
 fun RolePermissions(
     roleId: String,
@@ -74,6 +95,7 @@ fun RolePermissions(
     resourceServerNames: Map<String, String> = emptyMap(),
     title: String? = null,
     description: String? = null,
+    content: (@Composable (RolePermissionsState) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     val role = rememberGetRole(roleId)
@@ -85,5 +107,6 @@ fun RolePermissions(
         resourceServerNames = resourceServerNames,
         title = title,
         description = description,
+        content = content,
     )
 }

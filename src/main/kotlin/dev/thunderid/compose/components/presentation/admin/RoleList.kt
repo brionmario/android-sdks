@@ -3,6 +3,7 @@
 
 package dev.thunderid.compose.components.presentation.admin
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +24,8 @@ import dev.thunderid.compose.management.rememberGetRoles
  * @param onSelect Receives the chosen role. Rows are selectable only when set.
  * @param title Heading of the list. Pass an empty string to hide it.
  * @param actions Controls rendered next to the title, such as a button that opens [RoleCreate].
+ * @param content Renders custom UI in place of the default list, from the roles, the loading and error state,
+ *   and the pagination and selection handlers.
  */
 @Composable
 fun BaseRoleList(
@@ -39,8 +42,27 @@ fun BaseRoleList(
     title: String? = null,
     description: String? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    content: (@Composable (AdminListState<RoleSummary>) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
+    if (content != null) {
+        Box(modifier = modifier) {
+            content(
+                AdminListState(
+                    rows = roles,
+                    isLoading = isLoading,
+                    error = error,
+                    limit = limit,
+                    offset = offset,
+                    totalResults = totalResults ?: roles.size,
+                    selectedId = selectedRoleId,
+                    onPageChange = onPageChange,
+                    onSelect = onSelect,
+                ),
+            )
+        }
+        return
+    }
     AdminSection(
         block = "role-list",
         modifier = modifier,
@@ -68,7 +90,11 @@ fun BaseRoleList(
     }
 }
 
-/** Lists roles, a page at a time, through the role management operations. */
+/**
+ * Lists roles, a page at a time, through the role management operations.
+ *
+ * @param content Renders custom UI in place of the default list. See [BaseRoleList].
+ */
 @Composable
 fun RoleList(
     modifier: Modifier = Modifier,
@@ -78,6 +104,7 @@ fun RoleList(
     title: String? = null,
     description: String? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    content: (@Composable (AdminListState<RoleSummary>) -> Unit)? = null,
 ) {
     val i18n = LocalThunderID.current.i18n
     var offset by remember(limit) { mutableStateOf(0) }
@@ -96,5 +123,6 @@ fun RoleList(
         title = title,
         description = description,
         actions = actions,
+        content = content,
     )
 }
