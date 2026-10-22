@@ -210,4 +210,4 @@ val ComponentSpecs: List<ComponentSpec> =
                     "    onComplete = { /* signed in */ },\n    onError = { message -> /* show message */ },\n)"
             },
         ),
-    ) + AdminComponentSpecs
+    ) + AdminComponentSpecs + CustomRenderSpecs

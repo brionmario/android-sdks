@@ -111,7 +111,7 @@ fun ExplorerScreen() {
                 }
             }
         }
-        Preview(dark = dark, taps = taps, tall = isAdminStory(spec.id)) {
+        Preview(dark = dark, taps = taps, tall = isAdminStory(spec.id) || isCustomRenderStory(spec.id)) {
             StoryPreview(spec.id, storyId, props) { taps++ }
         }
         Column(
@@ -394,6 +394,10 @@ private fun StoryPreview(
 
         in AdminComponentSpecs.map { it.id } -> {
             AdminStoryPreview(componentId, storyId, props, onTap)
+        }
+
+        in CustomRenderSpecs.map { it.id } -> {
+            CustomRenderPreview(componentId, storyId, props, onTap)
         }
 
         "signin" -> {

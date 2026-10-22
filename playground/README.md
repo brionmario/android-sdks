@@ -41,6 +41,14 @@ next time you run it. It is a development tool, not a sample: for a minimal inte
 - **Logs**: everything the playground observed from the SDK: auth state changes, storage writes
   (key names only), redirects, and check results.
 
+## Custom rendering
+
+Every admin composable, `Base*` and connected, takes an optional trailing `content` lambda, the same pattern as
+`BaseSignIn`, and renders it in place of its own UI. The lambda gets the component's state: `AdminListState` (rows,
+paging and selection), `NamedResourceFormState` and the other form states (values, setters and `submit`), or the
+details states (the record and its actions). The explorer's **Custom rendering** group draws `UserList` as Material
+`ListItem`s with a pager, `GroupCreate` as a Material form and `UserDetails` as a Material card.
+
 ## Prerequisites
 
 - JDK 17 and the Android SDK (API 34). Set `ANDROID_HOME`, or add `sdk.dir` to a
