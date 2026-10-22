@@ -19,11 +19,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,69 +73,72 @@ internal fun <T> AdminTable(
     selectedRowId: String? = null,
     pagination: AdminPagination? = null,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp)) {
-            columns.forEach { column ->
-                Text(
-                    column.header,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(column.weight),
-                )
-            }
-        }
-        HorizontalDivider()
-        when {
-            error != null -> {
-                AdminErrorBanner(error, modifier = Modifier.padding(vertical = 8.dp))
-            }
-
-            isLoading && rows.isEmpty() -> {
-                AdminLoading(modifier = Modifier.padding(8.dp))
-            }
-
-            rows.isEmpty() -> {
-                Box(modifier = Modifier.padding(8.dp).testTag(adminTag(block, "empty"))) { AdminMuted(emptyText) }
-            }
-
-            else -> {
-                rows.forEach { row ->
-                    val id = rowId(row)
-                    val isSelected = id == selectedRowId
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .then(
-                                    if (onRowClick != null) {
-                                        Modifier.clickable(role = Role.Button) { onRowClick(row) }
-                                    } else {
-                                        Modifier
-                                    },
-                                ).then(
-                                    if (isSelected) {
-                                        Modifier.background(MaterialTheme.colorScheme.secondaryContainer)
-                                    } else {
-                                        Modifier
-                                    },
-                                ).semantics { selected = isSelected }
-                                .padding(horizontal = 8.dp, vertical = 8.dp)
-                                .testTag(adminTag(block, "row", id)),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        columns.forEach { column ->
-                            Row(modifier = Modifier.weight(column.weight), verticalAlignment = Alignment.CenterVertically) {
-                                column.cell(this, row)
-                            }
-                        }
-                    }
-                    HorizontalDivider()
+    // Cells render plain Text, so give them the theme's content color rather than LocalContentColor's black default.
+    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp)) {
+                columns.forEach { column ->
+                    Text(
+                        column.header,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(column.weight),
+                    )
                 }
             }
+            HorizontalDivider()
+            when {
+                error != null -> {
+                    AdminErrorBanner(error, modifier = Modifier.padding(vertical = 8.dp))
+                }
+
+                isLoading && rows.isEmpty() -> {
+                    AdminLoading(modifier = Modifier.padding(8.dp))
+                }
+
+                rows.isEmpty() -> {
+                    Box(modifier = Modifier.padding(8.dp).testTag(adminTag(block, "empty"))) { AdminMuted(emptyText) }
+                }
+
+                else -> {
+                    rows.forEach { row ->
+                        val id = rowId(row)
+                        val isSelected = id == selectedRowId
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .then(
+                                        if (onRowClick != null) {
+                                            Modifier.clickable(role = Role.Button) { onRowClick(row) }
+                                        } else {
+                                            Modifier
+                                        },
+                                    ).then(
+                                        if (isSelected) {
+                                            Modifier.background(MaterialTheme.colorScheme.secondaryContainer)
+                                        } else {
+                                            Modifier
+                                        },
+                                    ).semantics { selected = isSelected }
+                                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                                    .testTag(adminTag(block, "row", id)),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            columns.forEach { column ->
+                                Row(modifier = Modifier.weight(column.weight), verticalAlignment = Alignment.CenterVertically) {
+                                    column.cell(this, row)
+                                }
+                            }
+                        }
+                        HorizontalDivider()
+                    }
+                }
+            }
+            if (pagination != null && error == null) AdminPager(block, pagination, rows.size)
         }
-        if (pagination != null && error == null) AdminPager(block, pagination, rows.size)
     }
 }
 
