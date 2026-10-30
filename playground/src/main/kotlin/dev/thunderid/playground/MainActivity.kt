@@ -96,9 +96,11 @@ class MainActivity : ComponentActivity() {
         )
 
         val storage = RecordingStorageAdapter(EncryptedStorageAdapter(applicationContext))
+        // With a backend, baseUrl is the backend, and API calls go to its proxy, which maps them to the API.
+        val backendUrl = PlaygroundSettings.backendUrl.takeIf { it.isNotBlank() }
         val config =
             ThunderIDConfig(
-                baseUrl = PlaygroundSettings.baseUrl,
+                baseUrl = backendUrl ?: PlaygroundSettings.baseUrl,
                 clientId = PlaygroundSettings.clientId.takeIf { it.isNotBlank() },
                 applicationId = PlaygroundSettings.applicationId.takeIf { it.isNotBlank() },
                 afterSignInUrl = PlaygroundSettings.afterSignInUrl,
@@ -106,10 +108,7 @@ class MainActivity : ComponentActivity() {
                 scopes = PlaygroundSettings.scopes,
                 endpoints =
                     PlaygroundSettings.endpoints.copy(
-                        backend =
-                            PlaygroundSettings.backendUrl
-                                .takeIf { it.isNotBlank() }
-                                ?.let { ThunderIDBackendEndpoints(baseUrl = it) },
+                        backend = backendUrl?.let { ThunderIDBackendEndpoints() },
                     ),
                 storage = storage,
                 allowInsecureConnections = BuildConfig.DEBUG,

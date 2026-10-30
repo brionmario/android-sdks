@@ -30,7 +30,6 @@ class BackendEndpointsTest {
 
         assertEquals(
             ResolvedBackendEndpoints(
-                apiBaseUrl = API,
                 signIn = "$BACKEND/api/auth/signin",
                 session = "$BACKEND/api/auth/session",
                 checkSession = "$BACKEND/api/auth/checksession",
@@ -52,35 +51,59 @@ class BackendEndpointsTest {
                 backendConfig(
                     backend =
                         ThunderIDBackendEndpoints(
-                            baseUrl = "$BACKEND/",
                             signIn = "/gateway/signin",
                             proxy = "/gateway/api/",
                             token = "/gateway/token",
                             bypass = ThunderIDBackendBypass(urls = listOf("$DATA_PLANE/"), attachToken = false),
                         ),
-                ).copy(baseUrl = "$API/"),
+                ).copy(baseUrl = "$BACKEND/"),
             )!!
 
         assertEquals("$BACKEND/gateway/signin", resolved.signIn)
         assertEquals("$BACKEND/gateway/api", resolved.proxy)
         assertEquals("$BACKEND/gateway/token", resolved.token)
         assertEquals("$BACKEND/api/auth/signout", resolved.signOut)
-        assertEquals(API, resolved.apiBaseUrl)
         assertEquals(listOf(DATA_PLANE), resolved.bypassUrls)
         assertFalse(resolved.attachToken)
     }
 
     @Test
-    fun `initialize rejects a backend base URL that is not HTTPS before any request`() =
+    fun `an absolute HTTPS endpoint is used as is`() {
+        val resolved =
+            resolveBackendEndpoints(
+                backendConfig(
+                    backend =
+                        ThunderIDBackendEndpoints(
+                            signIn = "https://login.example.com/signin",
+                            proxy = "https://gateway.example.com/proxy/",
+                        ),
+                ),
+            )!!
+
+        assertEquals("https://login.example.com/signin", resolved.signIn)
+        assertEquals("https://gateway.example.com/proxy", resolved.proxy)
+        assertEquals("$BACKEND/api/auth/session", resolved.session)
+    }
+
+    @Test
+    fun `initialize rejects a baseUrl that is not HTTPS before any request`() =
         runTest {
-            assertRejected(ThunderIDBackendEndpoints(baseUrl = "http://app.example.com"))
+            val fake = FakeBackend()
+            try {
+                ThunderIDClient(fake).initialize(backendConfig().copy(baseUrl = "http://app.example.com"), InMemoryStorageAdapter())
+                fail("Expected IAMException")
+            } catch (e: IAMException) {
+                assertEquals(ThunderIDErrorCode.INVALID_CONFIGURATION, e.code)
+            }
+            assertTrue(fake.requests.isEmpty())
         }
 
     @Test
-    fun `initialize rejects an endpoint that is not a path under the backend base`() =
+    fun `initialize rejects an endpoint that is neither a path nor an HTTPS URL`() =
         runTest {
-            assertRejected(ThunderIDBackendEndpoints(baseUrl = BACKEND, signIn = "https://other.example.com/signin"))
-            assertRejected(ThunderIDBackendEndpoints(baseUrl = BACKEND, proxy = "//other.example.com/proxy"))
+            assertRejected(ThunderIDBackendEndpoints(signIn = "http://other.example.com/signin"))
+            assertRejected(ThunderIDBackendEndpoints(proxy = "//other.example.com/proxy"))
+            assertRejected(ThunderIDBackendEndpoints(session = "auth/session"))
         }
 
     @Test
@@ -88,7 +111,6 @@ class BackendEndpointsTest {
         runTest {
             assertRejected(
                 ThunderIDBackendEndpoints(
-                    baseUrl = BACKEND,
                     bypass = ThunderIDBackendBypass(urls = listOf("http://dp.example.com/api")),
                 ),
             )

@@ -39,6 +39,33 @@ dependencies {
 > [!NOTE]
 > Replace `<latest-release-tag>` with the [latest release tag](https://github.com/thunder-id/android-sdks/releases) of the `android-sdks` repository.
 
+## Backend mode
+
+Set `endpoints.backend` to hand sign-in to a backend your application owns (the Backend for Frontend
+pattern of RFC 10017). The backend runs the OAuth flow and keeps the tokens; the app holds only an opaque
+session handle.
+
+In backend mode, `baseUrl` is the backend. Each backend endpoint is a path resolved against it, or an
+absolute HTTPS URL used as is, and any endpoint left unset defaults to a path under `/api/auth`. API
+requests go to the backend's `proxy`, which maps them to your API: `httpRequest` takes a path relative to
+the proxy (or a URL under it), and the SDK's own calls go to `{baseUrl}{proxy}/users/me`,
+`{baseUrl}{proxy}/groups` and so on. Only the backend knows where the API is. Every URL must use HTTPS.
+
+```kotlin
+ThunderIDConfig(
+    baseUrl = "https://app.example.com", // the backend
+    endpoints =
+        ThunderIDEndpoints(
+            backend =
+                ThunderIDBackendEndpoints(
+                    proxy = "/api", // resolved against baseUrl: API calls go to https://app.example.com/api/...
+                    session = "/auth/session", // resolved against baseUrl
+                    signIn = "https://login.example.com/signin", // absolute, used as is
+                ),
+        ),
+)
+```
+
 ## Playground
 
 The [`playground`](playground) directory contains a Jetpack Compose app that builds this SDK from source and exercises

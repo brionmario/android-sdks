@@ -9,6 +9,7 @@ import dev.thunderid.android.EmbeddedSignInPayload
 import dev.thunderid.android.IAMException
 import dev.thunderid.android.InMemoryStorageAdapter
 import dev.thunderid.android.ThunderIDBackendBypass
+import dev.thunderid.android.ThunderIDBackendEndpoints
 import dev.thunderid.android.ThunderIDClient
 import dev.thunderid.android.ThunderIDErrorCode
 import dev.thunderid.android.ThunderIDHttpRequest
@@ -105,7 +106,7 @@ class BackendModeTest {
             signIn(client, fake, storage)
             fake.on("GET", "$PROXY/orders", response(200, "[]"))
 
-            val result = client.httpRequest(get("$API/orders"))
+            val result = client.httpRequest(get("/orders"))
 
             assertEquals(200, result.statusCode)
             val proxied = fake.to("$PROXY/orders").single()
@@ -114,7 +115,7 @@ class BackendModeTest {
         }
 
     @Test
-    fun `the SDK's own calls under baseUrl go through the proxy with the handle`() =
+    fun `the SDK's own calls go to the proxy with the handle`() =
         runTest {
             signIn(client, fake, storage)
             fake.on("GET", "$PROXY/users/me", response(200, """{"id":"u1"}"""))
@@ -123,6 +124,60 @@ class BackendModeTest {
             val proxied = fake.to("$PROXY/users/me").single()
             assertEquals("h-1", proxied.headers[SESSION_HANDLE_HEADER])
             assertNull(proxied.headers["Authorization"])
+        }
+
+    @Test
+    fun `management calls go to the proxy`() =
+        runTest {
+            signIn(client, fake, storage)
+            fake.on("DELETE", "$PROXY/users/u-1", response(204, ""))
+
+            client.users.delete("u-1")
+
+            val proxied = fake.to("$PROXY/users/u-1").single()
+            assertEquals("h-1", proxied.headers[SESSION_HANDLE_HEADER])
+            assertTrue(fake.requests.none { it.url.startsWith("$BACKEND/users") || it.url.startsWith("$API/users") })
+        }
+
+    @Test
+    fun `the SDK's own calls are built on baseUrl and the configured proxy`() =
+        runTest {
+            val gateway = "$BACKEND/gateway/api"
+            signIn(client, fake, storage, backendConfig(backend = ThunderIDBackendEndpoints(proxy = "/gateway/api")))
+            fake.on("GET", "$gateway/users/me", response(200, """{"id":"u1"}"""))
+            fake.on("DELETE", "$gateway/groups/g-1", response(204, ""))
+
+            assertEquals("u1", client.getUserProfile().id)
+            client.groups.delete("g-1")
+
+            assertEquals(1, fake.to("$gateway/users/me").size)
+            assertEquals(1, fake.to("$gateway/groups/g-1").size)
+        }
+
+    @Test
+    fun `the granted permissions come from the session, without the access token`() =
+        runTest {
+            fake.on(
+                "POST",
+                SESSION,
+                response(200, """{"handle":"h-1","isSignedIn":true,"scope":"openid system:user  system:group:view"}"""),
+            )
+            client.initialize(backendConfig(), storage)
+            client.buildSignInUrl()
+            client.handleRedirectCallback("$REDIRECT_URI?session_code=one-time")
+
+            assertEquals(listOf("openid", "system:user", "system:group:view"), client.getGrantedPermissions())
+            assertTrue(fake.to(TOKEN).isEmpty())
+        }
+
+    @Test
+    fun `a session without scope grants nothing, without asking for the access token`() =
+        runTest {
+            signIn(client, fake, storage)
+            fake.on("POST", TOKEN, tokenResponse("t-1"))
+
+            assertTrue(client.getGrantedPermissions().isEmpty())
+            assertTrue(fake.to(TOKEN).isEmpty())
         }
 
     @Test
@@ -168,7 +223,7 @@ class BackendModeTest {
             fake.on("GET", "$PROXY/orders", backendError("session_expired"), response(200, "[]"))
             fake.on("POST", REFRESH, response(204))
 
-            val result = client.httpRequest(get("$API/orders"))
+            val result = client.httpRequest(get("/orders"))
 
             assertEquals(200, result.statusCode)
             assertEquals(2, fake.to("$PROXY/orders").size)
@@ -183,7 +238,7 @@ class BackendModeTest {
             fake.on("GET", "$PROXY/orders", backendError("session_expired"))
             fake.on("POST", REFRESH, backendError("login_required"))
 
-            val result = client.httpRequest(get("$API/orders"))
+            val result = client.httpRequest(get("/orders"))
 
             assertEquals(401, result.statusCode)
             assertEquals(1, fake.to("$PROXY/orders").size)
@@ -200,7 +255,7 @@ class BackendModeTest {
             fake.on("GET", "$PROXY/orders", backendError("session_expired"))
             fake.on("POST", REFRESH, response(204))
 
-            val result = client.httpRequest(get("$API/orders"))
+            val result = client.httpRequest(get("/orders"))
 
             assertEquals(401, result.statusCode)
             assertEquals(1, fake.to(REFRESH).size)
@@ -216,8 +271,8 @@ class BackendModeTest {
             signIn(client, fake, storage)
             fake.on("GET", "$PROXY/orders", backendError("login_required"))
 
-            val result = client.httpRequest(get("$API/orders"))
-            client.httpRequest(get("$API/orders"))
+            val result = client.httpRequest(get("/orders"))
+            client.httpRequest(get("/orders"))
 
             assertEquals(401, result.statusCode)
             assertTrue(fake.to(REFRESH).isEmpty())
@@ -233,7 +288,7 @@ class BackendModeTest {
             val apiAnswer = response(401, """{"error":"invalid_token","detail":"from the API"}""")
             fake.on("GET", "$PROXY/orders", apiAnswer)
 
-            val result = client.httpRequest(get("$API/orders"))
+            val result = client.httpRequest(get("/orders"))
 
             assertEquals(apiAnswer, result)
             assertTrue(fake.to(REFRESH).isEmpty())
@@ -244,12 +299,15 @@ class BackendModeTest {
     // URL refusal
 
     @Test
-    fun `a URL outside the API base and the bypass URLs is refused and not sent`() =
+    fun `an absolute URL outside the proxy and the bypass URLs is refused and not sent`() =
         runTest {
             signIn(client, fake, storage)
             val before = fake.requests.size
 
             assertFails(ThunderIDErrorCode.INVALID_INPUT) { client.httpRequest(get("https://other.example.com/orders")) }
+            assertFails(ThunderIDErrorCode.INVALID_INPUT) { client.httpRequest(get("$API/orders")) }
+            assertFails(ThunderIDErrorCode.INVALID_INPUT) { client.httpRequest(get("$BACKEND/orders")) }
+            assertFails(ThunderIDErrorCode.INVALID_INPUT) { client.httpRequest(get("${PROXY}x/orders")) }
             assertFails(ThunderIDErrorCode.INVALID_INPUT) { client.httpRequest(get("$API.attacker.test/orders")) }
             assertFails(ThunderIDErrorCode.INVALID_INPUT) { client.httpRequest(get("${DATA_PLANE}x/items")) }
 
@@ -257,12 +315,23 @@ class BackendModeTest {
         }
 
     @Test
-    fun `a path relative to the API base goes through the proxy`() =
+    fun `a relative path goes under the proxy`() =
         runTest {
             signIn(client, fake, storage)
             fake.on("GET", "$PROXY/orders?page=2", response(200, "[]"))
 
             assertEquals(200, client.httpRequest(get("/orders?page=2")).statusCode)
+        }
+
+    @Test
+    fun `a URL already under the proxy is sent as is, not prefixed again`() =
+        runTest {
+            signIn(client, fake, storage)
+            fake.on("GET", "$PROXY/orders", response(200, "[]"))
+
+            assertEquals(200, client.httpRequest(get("$PROXY/orders")).statusCode)
+            assertEquals(1, fake.to("$PROXY/orders").size)
+            assertTrue(fake.requests.none { it.url.contains("/api/auth/proxy/api/auth/proxy") })
         }
 
     // Bypass

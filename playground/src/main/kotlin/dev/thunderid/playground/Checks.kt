@@ -370,7 +370,7 @@ class ChecksController(
         val request =
             ThunderIDHttpRequest(
                 method = "GET",
-                url = "${PlaygroundSettings.baseUrl}/users/me",
+                url = "/users/me", // relative to the backend's proxy
                 headers = mapOf("Accept" to "application/json"),
                 body = null,
             )

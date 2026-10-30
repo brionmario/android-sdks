@@ -65,6 +65,9 @@ class ThunderIDClient internal constructor(
     private var loading = false
     private var currentUser: User? = null
     private var backend: BackendClient? = null
+
+    /** Where the SDK's own API calls go: `baseUrl`, or the backend's proxy in backend mode. */
+    private var apiBase: String? = null
     private val sessionEndedEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     /**
@@ -90,7 +93,11 @@ class ThunderIDClient internal constructor(
                     ThunderIDErrorCode.INVALID_CONFIGURATION,
                     "A StorageAdapter is required on Android; pass an EncryptedStorageAdapter(context)",
                 )
-        val http = HttpClient(config.baseUrl, config.allowInsecureConnections, defaultTransport = transport)
+        // In backend mode `baseUrl` is the backend, so the SDK's own API calls (the profile, management)
+        // go to its proxy, which maps them to the API.
+        val base = backendEndpoints?.proxy ?: config.baseUrl
+        apiBase = base
+        val http = HttpClient(base, config.allowInsecureConnections, defaultTransport = transport)
         val store = TokenStore(adapter)
         val jwks = JWKSCache(http)
         tokenStore = store
@@ -225,7 +232,7 @@ class ThunderIDClient internal constructor(
 
     /**
      * The administration flows the server configures for operations that change state. They always run
-     * against `baseUrl`. Throws until [initialize] has run.
+     * against `baseUrl`, or the API base in backend mode. Throws until [initialize] has run.
      */
     val administration: AdministrationClient
         get() = AdministrationClient(managementTransport("flows") { null })
@@ -235,9 +242,16 @@ class ThunderIDClient internal constructor(
      * claim. Returns an empty list when nobody is signed in or the token is not a JWT. Test one against a
      * required permission with [dev.thunderid.android.management.hasPermission]. The result only decides what
      * to show: the server still decides every request.
+     *
+     * In backend mode they come only from the backend's session (`scope`): the token stays on the backend, so
+     * a session without `scope` grants nothing.
      */
     suspend fun getGrantedPermissions(): List<String> {
         if (!runCatching { isSignedIn() }.getOrDefault(false)) return emptyList()
+        backend?.let { backend ->
+            val scope = runCatching { backend.getSession().scope }.getOrNull()
+            return scope?.split(' ')?.filter { it.isNotEmpty() } ?: emptyList()
+        }
         return getTokenPermissions(runCatching { getAccessToken() }.getOrNull())
     }
 
@@ -247,11 +261,12 @@ class ThunderIDClient internal constructor(
     ): ManagementTransport {
         val cfg = config ?: throw IAMException(ThunderIDErrorCode.SDK_NOT_INITIALIZED, "Call initialize() before using the SDK")
         val http = httpClient ?: throw IAMException(ThunderIDErrorCode.SDK_NOT_INITIALIZED, "Call initialize() before using the SDK")
+        val base = apiBase ?: cfg.baseUrl
         return ManagementTransport(
             http,
-            override(cfg.endpoints) ?: "${cfg.baseUrl}/$collection",
+            override(cfg.endpoints) ?: "$base/$collection",
             cfg.http.fetcher,
-            cfg.baseUrl,
+            base,
         )
     }
 
@@ -404,13 +419,14 @@ class ThunderIDClient internal constructor(
     // MARK: - HTTP
 
     /**
-     * Sends a request to the application's API when sign-in runs on a backend. A request under `baseUrl`
-     * goes through the backend's proxy with the session handle; one under a bypass URL goes straight
-     * there, with the access token from the backend's `token` endpoint unless `attachToken` is off. The
-     * response comes back whatever its status, so the API's own `401` reaches the caller untouched.
+     * Sends a request to the application's API when sign-in runs on a backend. A relative path, or a URL
+     * already under the backend's proxy, goes to the proxy with the session handle; one under a bypass URL
+     * goes straight there, with the access token from the
+     * backend's `token` endpoint unless `attachToken` is off. The response comes back whatever its status,
+     * so the API's own `401` reaches the caller untouched.
      *
-     * @throws IAMException [ThunderIDErrorCode.INVALID_INPUT] when the URL is under neither, without
-     * sending it, and [ThunderIDErrorCode.UNSUPPORTED_OPERATION] when sign-in does not run on a backend.
+     * @throws IAMException [ThunderIDErrorCode.INVALID_INPUT] for any other absolute URL, without sending
+     * it, and [ThunderIDErrorCode.UNSUPPORTED_OPERATION] when sign-in does not run on a backend.
      */
     suspend fun httpRequest(request: ThunderIDHttpRequest): ThunderIDHttpResponse {
         requireInitialized()

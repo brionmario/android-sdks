@@ -245,9 +245,9 @@ internal class BackendClient(
      * session once and retries, and a second failure signs out; `login_required` signs out. Any other
      * response, `401` included, is the API's own answer and comes back untouched.
      *
-     * @throws IAMException [ThunderIDErrorCode.INVALID_INPUT] when the URL is neither under the API base
-     * nor under a bypass URL. Nothing is sent: sending it would turn an authenticated call into an
-     * anonymous one.
+     * @throws IAMException [ThunderIDErrorCode.INVALID_INPUT] when the URL is neither a relative path, under
+     * the proxy, nor under a bypass URL. Nothing is sent: sending it would turn an authenticated call into
+     * an anonymous one.
      */
     suspend fun send(
         request: ThunderIDHttpRequest,
@@ -258,7 +258,7 @@ internal class BackendClient(
             toProxyUrl(request.url)
                 ?: throw IAMException(
                     ThunderIDErrorCode.INVALID_INPUT,
-                    "The request URL is not under the API base or a bypass URL, so it was not sent",
+                    "The request URL is not a relative path, under the backend's proxy or under a bypass URL, so it was not sent",
                 )
         val headers = withoutCredentials(request.headers)
 
@@ -302,17 +302,16 @@ internal class BackendClient(
         return tokenRequest.run { requestAccessToken() }
     }
 
-    /** Maps an API URL to its proxy URL, or returns `null` when it is not under the API base. */
-    fun toProxyUrl(url: String): String? {
-        val base = endpoints.apiBaseUrl
-        val rest =
-            when {
-                isUnder(url, base) -> url.substring(base.length)
-                url.startsWith("/") && !url.startsWith("//") -> url
-                else -> return null
-            }
-        return endpoints.proxy + if (rest.startsWith("/")) rest else "/$rest"
-    }
+    /**
+     * The proxy URL for an API request: a URL already under the proxy as it is, a relative path under the
+     * proxy, or `null` for any other absolute URL, which the backend does not serve.
+     */
+    fun toProxyUrl(url: String): String? =
+        when {
+            isUnder(url, endpoints.proxy) -> url
+            url.startsWith("/") && !url.startsWith("//") -> endpoints.proxy + url
+            else -> null
+        }
 
     /** Whether a request to [url] skips the proxy and goes straight from the app. */
     fun isBypassed(url: String): Boolean = endpoints.bypassUrls.any { isUnder(url, it) }
@@ -425,6 +424,7 @@ internal class BackendClient(
             isSignedIn = json.get("isSignedIn")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
             user = user,
             expiresAt = json.get("expiresAt")?.takeIf { it.isJsonPrimitive }?.asDouble,
+            scope = json.string("scope"),
         )
     }
 

@@ -8,18 +8,21 @@ package dev.thunderid.android
  *
  * Setting them hands sign-in to a backend the application owns (the Backend for Frontend pattern of
  * RFC 10017): the backend runs the OAuth flow and keeps the tokens, and the app holds only an opaque
- * session handle in the platform's secure store. Requests through [ThunderIDClient.httpRequest], and
- * the SDK's own calls under `baseUrl`, go through the backend's [proxy], which attaches the access
- * token.
+ * session handle in the platform's secure store. API requests, through [ThunderIDClient.httpRequest] and
+ * the SDK's own calls, go to the backend's [proxy], which maps them to the API and attaches the access
+ * token. Only the backend knows where the API is.
  *
- * Each endpoint is a path resolved against [baseUrl]. Any endpoint left unset defaults to a fixed path
- * under `/api/auth`.
+ * In backend mode the config's `baseUrl` is the backend. Each endpoint is a path resolved against it, or
+ * an absolute HTTPS URL used as is. Any endpoint left unset defaults to a fixed path under `/api/auth`, so
+ * the SDK's own API calls go to `{baseUrl}{proxy}/users/me`, `{baseUrl}{proxy}/groups` and so on.
  *
  * ```kotlin
- * endpoints = ThunderIDEndpoints(backend = ThunderIDBackendEndpoints(baseUrl = "https://app.example.com"))
+ * ThunderIDConfig(
+ *     baseUrl = "https://app.example.com", // the backend
+ *     endpoints = ThunderIDEndpoints(backend = ThunderIDBackendEndpoints(proxy = "/api")),
+ * )
  * ```
  *
- * @property baseUrl Base URL of the backend. Must use HTTPS. Every backend call goes to it.
  * @property signIn Starts sign-in, opened in a Custom Tab. Defaults to `/api/auth/signin`.
  * @property session Exchanges the one-time sign-in code for a session handle, and reports the signed-in
  * user. Defaults to `/api/auth/session`.
@@ -27,14 +30,13 @@ package dev.thunderid.android
  * counting as activity, so the SDK can poll it. Defaults to `/api/auth/checksession`.
  * @property refresh Refreshes the session. Defaults to `/api/auth/refresh`.
  * @property signOut Ends the session. Defaults to `/api/auth/signout`.
- * @property proxy Prefix of the API proxy. Requests under `baseUrl` are sent through it. Defaults to
- * `/api/auth/proxy`.
+ * @property proxy The API proxy: the base of every API request, the SDK's own included. A relative
+ * request path is sent under it. Defaults to `/api/auth/proxy`.
  * @property token Issues the access token for [bypass], as an OAuth token response without a refresh
  * token. Defaults to `/api/auth/token`.
  * @property bypass Requests that skip the proxy and go straight from the app.
  */
 data class ThunderIDBackendEndpoints(
-    val baseUrl: String,
     val signIn: String? = null,
     val session: String? = null,
     val checkSession: String? = null,
